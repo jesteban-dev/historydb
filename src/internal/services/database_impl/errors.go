@@ -1,4 +1,4 @@
-package impl
+package database_impl
 
 import "errors"
 
