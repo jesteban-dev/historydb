@@ -7,11 +7,14 @@ import (
 	"historydb/src/internal/services"
 	"historydb/src/internal/services/database_impl/entities"
 	"historydb/src/internal/services/database_impl/utils"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/lib/pq"
 )
+
+var routineWrapperRegex = regexp.MustCompile(`(?s)(\$\w*\$.*?\$\w*\$)`)
 
 // DatabaseReaderPostgreSQL represents the implementation of DatabaseReader for PostgreSQL databases.
 type PostgreSQLDatabaseReader struct {
@@ -70,8 +73,14 @@ func (dbReader *PostgreSQLDatabaseReader) GetDatabaseExtraInfo() (services.DBExt
 		return nil, err
 	}
 
+	routines, err := dbReader.extractRoutines()
+	if err != nil {
+		return nil, err
+	}
+
 	return &entities.PSQLDBExtraInfo{
 		Sequences: sequences,
+		Routines:  routines,
 	}, nil
 }
 
@@ -454,4 +463,65 @@ func (dbReader *PostgreSQLDatabaseReader) extractSequences() ([]entities.PSQLSeq
 	}
 
 	return sequences, nil
+}
+
+// extractFunctions is a PostgreSQL specific method that return the functions used in the database.
+//
+// It returns a slice of functions and an slices of errors if something fails.
+func (dbReader *PostgreSQLDatabaseReader) extractRoutines() ([]entities.PSQLRoutine, error) {
+	rows, err := dbReader.db.Query(`
+		SELECT ns.nspname AS schema_name, p.proname AS function_name, p.prokind as type, pg_get_function_arguments(p.oid) AS arguments, pg_get_function_result(p.oid) AS return_type, l.lanname AS language, pg_get_functiondef(p.oid) AS definition
+		FROM pg_proc p
+		JOIN pg_namespace ns ON ns.oid = p.pronamespace
+		JOIN pg_language l ON l.oid = p.prolang
+		WHERE ns.nspname NOT IN ('pg_catalog', 'information_schema') AND p.prokind IN ('f', 'p')
+		ORDER BY ns.nspname, p.proname
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	functions := []entities.PSQLRoutine{}
+	for rows.Next() {
+		var f entities.PSQLRoutineQuery
+		if err := rows.Scan(&f.SchemaName, &f.FunctionName, &f.Type, &f.Arguments, &f.ReturnType, &f.Language, &f.Definition); err != nil {
+			return nil, err
+		}
+
+		argumentsList := strings.Split(f.Arguments, ",")
+		arguments := make([]entities.PSQLArgument, 0, len(argumentsList))
+		for i, argument := range argumentsList {
+			if i > 0 {
+				argument = argument[1:]
+			}
+
+			data := strings.Split(argument, " ")
+			if len(data) < 2 {
+				return nil, fmt.Errorf("%v: %s", ErrArgumentParsing, argument)
+			} else if len(data) > 2 && (strings.HasPrefix(data[0], "OUT") || strings.HasPrefix(data[0], "IN")) {
+				arguments = append(arguments, entities.PSQLArgument{IsOut: data[0] == "OUT", Name: data[1], Type: strings.Join(data[2:], " ")})
+			} else {
+				arguments = append(arguments, entities.PSQLArgument{Name: data[0], Type: strings.Join(data[1:], " ")})
+			}
+		}
+
+		var def string = f.Definition
+		matches := routineWrapperRegex.FindStringSubmatch(f.Definition)
+		if len(matches) == 2 {
+			def = matches[1]
+			//def = strings.TrimSpace(def)
+		}
+
+		functions = append(functions, entities.PSQLRoutine{
+			RoutineType: entities.RoutineType(f.Type),
+			RoutineName: fmt.Sprintf("%s.%s", f.SchemaName, f.FunctionName),
+			Arguments:   arguments,
+			ReturnType:  f.ReturnType,
+			Language:    f.Language,
+			Definition:  def,
+		})
+	}
+
+	return functions, nil
 }

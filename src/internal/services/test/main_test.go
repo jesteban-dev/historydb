@@ -18,6 +18,7 @@ type DBSQLTestContent struct {
 	DBName       string
 	Tables       []entities.SQLTable
 	Sequences    []entities.PSQLSequence
+	Routines     []entities.PSQLRoutine
 	TableContent map[string]DBSQLTableContent
 }
 
