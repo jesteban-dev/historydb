@@ -1,4 +1,4 @@
-package entities
+package models
 
 // PSQLColumn is the struct used to retrieve the columns into a PostgreSQL table.
 type PSQLColumnQuery struct {

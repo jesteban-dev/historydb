@@ -7,7 +7,7 @@ import (
 	"historydb/src/internal/helpers"
 	"historydb/src/internal/services"
 	"historydb/src/internal/services/database_impl"
-	"historydb/src/internal/services/database_impl/entities"
+	"historydb/src/internal/services/entities"
 	"log"
 	"regexp"
 	"strings"
@@ -275,7 +275,7 @@ var imageData = map[string]DBSQLTestContent{
 			{SequenceName: "public.products_prod_id_seq", DataType: "integer", StartValue: uint(1), MinimumValue: uint(1), MaximumValue: uint(2147483647), Increment: uint(1), CycleOption: false, LastValue: uint(10000), IsCalled: true},
 		},
 		Routines: []entities.PSQLRoutine{
-			{RoutineType: entities.RoutineTypeFunction, RoutineName: "public.new_customer", Arguments: []entities.PSQLArgument{{Name: "firstname_in", Type: "character varying"}, {Name: "lastname_in", Type: "character varying"}, {Name: "address1_in", Type: "character varying"}, {Name: "address2_in", Type: "character varying"}, {Name: "city_in", Type: "character varying"}, {Name: "state_in", Type: "character varying"}, {Name: "zip_in", Type: "integer"}, {Name: "country_in", Type: "character varying"}, {Name: "region_in", Type: "integer"}, {Name: "email_in", Type: "character varying"}, {Name: "phone_in", Type: "character varying"}, {Name: "creditcardtype_in", Type: "integer"}, {Name: "creditcard_in", Type: "character varying"}, {Name: "creditcardexpiration_in", Type: "character varying"}, {Name: "username_in", Type: "character varying"}, {Name: "password_in", Type: "character varying"}, {Name: "age_in", Type: "integer"}, {Name: "income_in", Type: "integer"}, {Name: "gender_in", Type: "character varying"}, {Name: "customerid_out", Type: "integer", IsOut: true}}, ReturnType: "integer", Language: "plpgsql", Definition: "$function$ DECLARE rows_returned INT; BEGIN SELECT COUNT(*) INTO rows_returned FROM CUSTOMERS WHERE USERNAME = username_in; IF rows_returned = 0 THEN INSERT INTO CUSTOMERS ( FIRSTNAME, LASTNAME, EMAIL, PHONE, USERNAME, PASSWORD, ADDRESS1, ADDRESS2, CITY, STATE, ZIP, COUNTRY, REGION, CREDITCARDTYPE, CREDITCARD, CREDITCARDEXPIRATION, AGE, INCOME, GENDER ) VALUES ( firstname_in, lastname_in, email_in, phone_in, username_in, password_in, address1_in, address2_in, city_in, state_in, zip_in, country_in, region_in, creditcardtype_in, creditcard_in, creditcardexpiration_in, age_in, income_in, gender_in ) ; select currval(pg_get_serial_sequence('customers', 'customerid')) into customerid_out; ELSE customerid_out := 0; END IF; END $function$"},
+			{RoutineType: entities.FUNCTION, RoutineName: "public.new_customer", Arguments: []entities.PSQLArgument{{Name: "firstname_in", Type: "character varying"}, {Name: "lastname_in", Type: "character varying"}, {Name: "address1_in", Type: "character varying"}, {Name: "address2_in", Type: "character varying"}, {Name: "city_in", Type: "character varying"}, {Name: "state_in", Type: "character varying"}, {Name: "zip_in", Type: "integer"}, {Name: "country_in", Type: "character varying"}, {Name: "region_in", Type: "integer"}, {Name: "email_in", Type: "character varying"}, {Name: "phone_in", Type: "character varying"}, {Name: "creditcardtype_in", Type: "integer"}, {Name: "creditcard_in", Type: "character varying"}, {Name: "creditcardexpiration_in", Type: "character varying"}, {Name: "username_in", Type: "character varying"}, {Name: "password_in", Type: "character varying"}, {Name: "age_in", Type: "integer"}, {Name: "income_in", Type: "integer"}, {Name: "gender_in", Type: "character varying"}, {Name: "customerid_out", Type: "integer", IsOut: true}}, ReturnType: "integer", Language: "plpgsql", Definition: "$function$ DECLARE rows_returned INT; BEGIN SELECT COUNT(*) INTO rows_returned FROM CUSTOMERS WHERE USERNAME = username_in; IF rows_returned = 0 THEN INSERT INTO CUSTOMERS ( FIRSTNAME, LASTNAME, EMAIL, PHONE, USERNAME, PASSWORD, ADDRESS1, ADDRESS2, CITY, STATE, ZIP, COUNTRY, REGION, CREDITCARDTYPE, CREDITCARD, CREDITCARDEXPIRATION, AGE, INCOME, GENDER ) VALUES ( firstname_in, lastname_in, email_in, phone_in, username_in, password_in, address1_in, address2_in, city_in, state_in, zip_in, country_in, region_in, creditcardtype_in, creditcard_in, creditcardexpiration_in, age_in, income_in, gender_in ) ; select currval(pg_get_serial_sequence('customers', 'customerid')) into customerid_out; ELSE customerid_out := 0; END IF; END $function$"},
 		},
 		TableContent: map[string]DBSQLTableContent{
 			"public.categories": {BatchSize: 4, Rows: []entities.TableRow{
@@ -491,7 +491,7 @@ func testGetSchemaDataBatch(t *testing.T, dbReader services.DatabaseReader, expe
 		table := schema.(*entities.SQLTable)
 
 		expectedRows := expectedData.TableContent[table.TableName].Rows
-		var cursor services.BatchCursor = nil
+		var cursor entities.BatchCursor = nil
 		expectedRowIndex := 0
 		for {
 			rows, nextCursor, err := dbReader.GetSchemaDataBatch(table, expectedData.TableContent[table.TableName].BatchSize, cursor)
