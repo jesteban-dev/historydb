@@ -3,5 +3,8 @@ package entities
 import "errors"
 
 var (
-	ErrHashFailed = errors.New("impossible to create hash")
+	ErrArgumentParsing = errors.New("impossible to parse argument")
+	ErrBackupExists    = errors.New("backup path already exists")
+	ErrHashFailed      = errors.New("impossible to create hash")
+	ErrNullSchema      = errors.New("null schema")
 )
