@@ -5,19 +5,46 @@ import (
 	"encoding/json"
 )
 
-// TableRow is the struct where the table row in SQL will be saved to process it.
-type TableRow map[string]interface{}
-
-// TableColumn is the struct where the table column metadata in SQL will be saved to process it.
-type TableColumn struct {
-	ColumnName     string  `json:"name"`
-	ColumnType     string  `json:"type"`
-	IsNullable     bool    `json:"isNullable"`
-	DefaultValue   *string `json:"defaultValue"`
-	ColumnPosition uint    `json:"position"`
+type SQLTable struct {
+	SchemaType  string               `json:"schemaType"`
+	TableName   string               `json:"tableName"`
+	Columns     []SQLTableColumn     `json:"columns"`
+	Constraints []SQLTableConstraint `json:"constraints"`
+	ForeignKeys []SQLTableForeignKey `json:"foreignKeys"`
+	Indexes     []SQLTableIndex      `json:"indexes"`
 }
 
-// ConstraintType is an enumeration of the supported constraint types in SQL.
+func (table *SQLTable) GetName() string {
+	return table.TableName
+}
+
+func (table *SQLTable) ToJson() ([]byte, error) {
+	json, err := json.Marshal(table)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	return json, nil
+}
+
+func (table *SQLTable) Hash() ([32]byte, error) {
+	json, err := table.ToJson()
+	if err != nil {
+		return [32]byte{}, err
+	}
+
+	hashValue := sha256.Sum256(json)
+	return hashValue, nil
+}
+
+type SQLTableColumn struct {
+	Name         string  `json:"name"`
+	Type         string  `json:"type"`
+	IsNullable   bool    `json:"isNullable"`
+	DefaultValue *string `json:"defaultValue"`
+	Position     int     `json:"position"`
+}
+
 type ConstraintType string
 
 const (
@@ -26,15 +53,13 @@ const (
 	Check      ConstraintType = "CHECK"
 )
 
-// TableConstraint is the struct where the table constraint metadata in SQL will be saved to process it.
-type TableConstraint struct {
-	ConstraintType ConstraintType `json:"type"`
-	ConstraintName string         `json:"name"`
-	Columns        []string       `json:"columns"`
-	Definition     *string        `json:"definition"`
+type SQLTableConstraint struct {
+	Type       ConstraintType `json:"type"`
+	Name       string         `json:"name"`
+	Columns    []string       `json:"columns"`
+	Definition *string        `json:"definition"`
 }
 
-// ActionType is an enumeration of the supported update and delete action for foreign keys in SQL.
 type ActionType string
 
 const (
@@ -45,9 +70,8 @@ const (
 	SetDefault ActionType = "SET DEFAULT"
 )
 
-// ForeignKey is the struct where the table foreign key metadata in SQL will be saved to process it.
-type ForeignKey struct {
-	ConstraintName    string     `json:"name"`
+type SQLTableForeignKey struct {
+	Name              string     `json:"name"`
 	Columns           []string   `json:"columns"`
 	ReferencedTable   string     `json:"referencedTable"`
 	ReferencedColumns []string   `json:"referencedColumn"`
@@ -55,49 +79,9 @@ type ForeignKey struct {
 	DeleteAction      ActionType `json:"deleteAction"`
 }
 
-// Index is the struct where the table index metadata in SQL will be saved to process it.
-type Index struct {
-	IndexName string                 `json:"name"`
-	IndexType string                 `json:"type"`
-	Columns   []string               `json:"columns"`
-	Options   map[string]interface{} `json:"options"`
-}
-
-// BatchCursor is the struct used in SQL languages to batch the data queries in a table.
-type SQLBatchCursor struct {
-	Offset uint
-	LastPK interface{}
-}
-
-// SQLTable is the struct that represents all the SQL Table metadata.
-type SQLTable struct {
-	hash        *[32]byte         `json:"-"`
-	TableName   string            `json:"name"`
-	Columns     []TableColumn     `json:"columns"`
-	Constraints []TableConstraint `json:"constraints"`
-	ForeignKeys []ForeignKey      `json:"foreignKeys"`
-	Indexes     []Index           `json:"indexes"`
-}
-
-func (sqlTable *SQLTable) Hash() ([32]byte, error) {
-	if sqlTable.hash == nil {
-		data, err := json.Marshal(sqlTable)
-		if err != nil {
-			return [32]byte{}, ErrHashFailed
-		}
-
-		hashValue := sha256.Sum256(data)
-		sqlTable.hash = &hashValue
-	}
-
-	return *sqlTable.hash, nil
-}
-
-func (sqlTable *SQLTable) ToJSON() ([]byte, error) {
-	data, err := json.MarshalIndent(sqlTable, "", "  ")
-	if err != nil {
-		return []byte{}, err
-	}
-
-	return data, nil
+type SQLTableIndex struct {
+	Name    string                 `json:"name"`
+	Type    string                 `json:"type"`
+	Columns []string               `json:"columns"`
+	Options map[string]interface{} `json:"options"`
 }

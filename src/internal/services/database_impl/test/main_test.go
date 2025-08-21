@@ -9,17 +9,9 @@ import (
 	"testing"
 )
 
-type DBSQLTableContent struct {
-	BatchSize uint
-	Rows      []entities.TableRow
-}
-
 type DBSQLTestContent struct {
-	DBName       string
-	Tables       []entities.SQLTable
-	Sequences    []entities.PSQLSequence
-	Routines     []entities.PSQLRoutine
-	TableContent map[string]DBSQLTableContent
+	DBName string
+	Tables []entities.SQLTable
 }
 
 var dbCases = []string{"postgres"}
@@ -28,7 +20,7 @@ func TestMain(t *testing.T) {
 	for _, dbType := range dbCases {
 		switch dbType {
 		case "postgres":
-			runPostgreSQLTests(t)
+			runPSQLReaderTests(t)
 		default:
 			log.Fatalf("Unsupported DB: %s", dbType)
 		}
