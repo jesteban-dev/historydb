@@ -68,7 +68,7 @@ func (dbReader *PSQLDatabaseReader) GetSchemaDefinition(schemaName string) (enti
 	}
 
 	return &serv_entities.SQLTable{
-		SchemaType:  "SQLTable",
+		SchemaType:  serv_entities.Relational,
 		TableName:   schemaName,
 		Columns:     columns,
 		Constraints: constraints,

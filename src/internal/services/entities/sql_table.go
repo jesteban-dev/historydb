@@ -5,8 +5,14 @@ import (
 	"encoding/json"
 )
 
+type SchemaType string
+
+const (
+	Relational SchemaType = "RELATIONAL"
+)
+
 type SQLTable struct {
-	SchemaType  string               `json:"schemaType"`
+	SchemaType  SchemaType           `json:"schemaType"`
 	TableName   string               `json:"tableName"`
 	Columns     []SQLTableColumn     `json:"columns"`
 	Constraints []SQLTableConstraint `json:"constraints"`
@@ -18,17 +24,8 @@ func (table *SQLTable) GetName() string {
 	return table.TableName
 }
 
-func (table *SQLTable) ToJson() ([]byte, error) {
-	json, err := json.Marshal(table)
-	if err != nil {
-		return []byte{}, err
-	}
-
-	return json, nil
-}
-
 func (table *SQLTable) Hash() ([32]byte, error) {
-	json, err := table.ToJson()
+	json, err := json.Marshal(table)
 	if err != nil {
 		return [32]byte{}, err
 	}
