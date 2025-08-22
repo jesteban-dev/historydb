@@ -36,7 +36,7 @@ func BackupApp(args []string, logger *slog.Logger) {
 	dbFactory := createDatabaseFactory(engine, db)
 	backupFactory := createBackupFactory(*basePath)
 
-	backupUsecases := usecases.NewBackupUsecases(dbFactory, backupFactory)
+	backupUsecases := usecases.NewBackupUsecases(dbFactory, backupFactory, logger)
 
 	switch action {
 	case "create":

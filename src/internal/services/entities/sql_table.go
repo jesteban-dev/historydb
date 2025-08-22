@@ -2,6 +2,7 @@ package entities
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 )
 
@@ -24,14 +25,14 @@ func (table *SQLTable) GetName() string {
 	return table.TableName
 }
 
-func (table *SQLTable) Hash() ([32]byte, error) {
+func (table *SQLTable) Hash() (string, error) {
 	json, err := json.Marshal(table)
 	if err != nil {
-		return [32]byte{}, err
+		return "", err
 	}
 
 	hashValue := sha256.Sum256(json)
-	return hashValue, nil
+	return hex.EncodeToString(hashValue[:]), nil
 }
 
 type SQLTableColumn struct {
