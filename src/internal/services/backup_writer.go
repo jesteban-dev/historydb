@@ -7,5 +7,5 @@ type BackupWriter interface {
 	CreateBackupStructure() error
 	DeleteBackupStructure() error
 	WriteSchema(schema entities.Schema) error
-	CommitSnapshotList(snapshotList []entities.Snapshot) error
+	CommitSnapshot(metadata entities.BackupMetadata) error
 }

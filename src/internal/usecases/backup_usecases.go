@@ -27,7 +27,7 @@ func (uc *BackupUsecases) CreateBackup() {
 	dbReader := uc.dbFactory.CreateReader()
 	backupWriter := uc.backupFactory.CreateWriter()
 
-	snapshot := entities.Snapshot{
+	snapshot := entities.BackupSnapshot{
 		Id:        uuid.NewString(),
 		Timestamp: time.Now(),
 		Schemas:   make(map[string]string),
@@ -49,7 +49,7 @@ func (uc *BackupUsecases) CreateBackup() {
 
 	schemaDefinitionBar := progressbar.NewOptions(
 		len(schemaNames),
-		progressbar.OptionSetDescription(fmt.Sprintf("Saving all %d schema definitions...", len(schemaNames))),
+		progressbar.OptionSetDescription(fmt.Sprintf("  + Saving all %d schema definitions...", len(schemaNames))),
 		progressbar.OptionSetWidth(30),
 		progressbar.OptionSetWriter(os.Stdout),
 		progressbar.OptionSetRenderBlankState(true),
@@ -79,7 +79,12 @@ func (uc *BackupUsecases) CreateBackup() {
 	}
 	fmt.Printf("\n  - All schema definitions saved successfully\n")
 
-	if err := backupWriter.CommitSnapshotList([]entities.Snapshot{snapshot}); err != nil {
+	backupMetadata := entities.BackupMetadata{
+		Database:  uc.dbFactory.GetDBMetadata(),
+		Snapshots: []entities.BackupSnapshot{snapshot},
+	}
+
+	if err := backupWriter.CommitSnapshot(backupMetadata); err != nil {
 		uc.logger.Error("impossible to write snapshot log", "error", err.Error())
 		uc.cleanAbortingBackup(backupWriter)
 		return
