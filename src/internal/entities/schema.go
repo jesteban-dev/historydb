@@ -4,4 +4,11 @@ package entities
 type Schema interface {
 	GetName() string
 	Hash() (string, error)
+	Diff(schema Schema) SchemaDiff
+	ApplyDiff(diff SchemaDiff) Schema
+}
+
+type SchemaDiff interface {
+	GetPrevRef() string
+	GetSchemaHash() string
 }

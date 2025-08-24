@@ -1,6 +1,8 @@
 package backup_impl
 
-import "historydb/src/internal/services"
+import (
+	"historydb/src/internal/services"
+)
 
 type JSONBackupFactory struct {
 	basePath string
@@ -8,6 +10,10 @@ type JSONBackupFactory struct {
 
 func NewJSONBackupFactory(basePath string) *JSONBackupFactory {
 	return &JSONBackupFactory{basePath}
+}
+
+func (factory *JSONBackupFactory) CreateReader() services.BackupReader {
+	return NewJSONBackupReader(factory.basePath)
 }
 
 func (factory *JSONBackupFactory) CreateWriter() services.BackupWriter {

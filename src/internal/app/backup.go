@@ -10,6 +10,7 @@ import (
 	"strconv"
 )
 
+// BackupApp is the main execution for backup mode in the app
 func BackupApp(args []string, logger *slog.Logger) {
 	if len(args) < 1 {
 		printBackupHelp()
@@ -52,11 +53,13 @@ func BackupApp(args []string, logger *slog.Logger) {
 	switch action {
 	case "create":
 		backupUsecases.CreateBackup()
+	case "snapshot":
+		backupUsecases.SnapshotBackup()
 	}
 }
 
 func checkBackupArgsAndObtainEngine(action, connString, path string) (string, error) {
-	if _, ok := supportedActions[action]; !ok {
+	if _, ok := supportedBackupActions[action]; !ok {
 		fmt.Printf("The action '%s' is not supported in the backup app.\n", action)
 		return "", fmt.Errorf("unsupported action provided")
 	}
@@ -91,5 +94,5 @@ func printBackupHelp() {
 	fmt.Println("  snapshot \tIt snapshots the current state of the database into the already created backup")
 	fmt.Println("Options:")
 	fmt.Println("  --connString \tDatabase connection string")
-	fmt.Println("  --path \tPath where the backup directory is located, or where it will be created")
+	fmt.Println("  --path \tPath where the backup is located, or where it will be created")
 }

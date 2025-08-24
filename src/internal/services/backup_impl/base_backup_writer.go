@@ -20,7 +20,10 @@ func (writer *BaseBackupWriter) CreateBackupStructure() error {
 		return err
 	}
 
-	err = os.Mkdir(filepath.Join(writer.basePath, "schemas"), 0755)
+	if err := os.Mkdir(filepath.Join(writer.basePath, "schemas"), 0755); err != nil {
+		return err
+	}
+
 	return err
 }
 

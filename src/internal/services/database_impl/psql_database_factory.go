@@ -29,3 +29,7 @@ func (factory *PSQLDatabaseFactory) GetDBMetadata() entities.BackupDatabase {
 		DbName: factory.dbName,
 	}
 }
+
+func (factory *PSQLDatabaseFactory) CheckBackupDB(db entities.BackupDatabase) bool {
+	return db.Engine == "postgres" && db.Host == factory.host && db.Port == factory.port && db.DbName == factory.dbName
+}
