@@ -12,9 +12,6 @@ type BackupMetadata struct {
 // so when the user snapshots a DB, check that the DB is the correct one
 type BackupDatabase struct {
 	Engine string `json:"engine"`
-	Host   string `json:"host"`
-	Port   int    `json:"port"`
-	DbName string `json:"dbName"`
 }
 
 // BackupSnapshot defines the main info for all the snapshots taken in the backup

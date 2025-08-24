@@ -107,7 +107,7 @@ func (uc *BackupUsecases) SnapshotBackup() {
 	}
 
 	if !uc.dbFactory.CheckBackupDB(metadata.Database) {
-		fmt.Println("The database does not match with the backup")
+		fmt.Println("The database engine does not match with the backup")
 		return
 	}
 	lastSnapshot := metadata.Snapshots[len(metadata.Snapshots)-1]
@@ -122,8 +122,15 @@ func (uc *BackupUsecases) SnapshotBackup() {
 		uc.logger.Error("impossible to list schema names from database", "error", err.Error())
 		return
 	}
+	fmt.Printf("Successfully read %d schemas: %s\n", len(schemaNames), strings.Join(schemaNames, ", "))
 
-	fmt.Println("Updating schema definitions...")
+	schemaDefinitionBar := progressbar.NewOptions(
+		len(schemaNames),
+		progressbar.OptionSetDescription(fmt.Sprintf("  + Updating all %d schema definitions...", len(schemaNames))),
+		progressbar.OptionSetWidth(30),
+		progressbar.OptionSetWriter(os.Stdout),
+		progressbar.OptionSetRenderBlankState(true),
+	)
 	for _, schemaName := range schemaNames {
 		schema, err := dbReader.GetSchemaDefinition(schemaName)
 		if err != nil {
@@ -141,19 +148,13 @@ func (uc *BackupUsecases) SnapshotBackup() {
 
 		prevHash, ok := lastSnapshot.Schemas[schemaName]
 		if !ok {
-			fmt.Println("  + Adding new schema " + schemaName + "...")
-
 			if err := backupWriter.WriteSchema(newSnapshot.Id, schema); err != nil {
 				uc.logger.Error("impossible to write schema into backup", "error", err.Error())
 				uc.rollbackSnapshot(newSnapshot.Id, backupWriter)
 				return
 			}
-
-			fmt.Println("  - Schema " + schemaName + " saved successfully")
 			newSnapshot.Schemas[schemaName] = hash
 		} else if !helpers.CompareHashes(prevHash, hash) {
-			fmt.Println("  + Updating schema " + schemaName + "...")
-
 			prevSchema, err := backupReader.ReadSchema(prevHash)
 			if err != nil {
 				uc.logger.Error("impossible to read schema from backup", "error", err.Error())
@@ -167,14 +168,14 @@ func (uc *BackupUsecases) SnapshotBackup() {
 				uc.rollbackSnapshot(newSnapshot.Id, backupWriter)
 				return
 			}
-
-			fmt.Println("  - Schema " + schemaName + " updated successfully")
 			newSnapshot.Schemas[schemaName] = hash
 		} else {
-			fmt.Println("  + Schema " + schemaName + " has no updates")
 			newSnapshot.Schemas[schemaName] = prevHash
 		}
+
+		schemaDefinitionBar.Add(1)
 	}
+	fmt.Println("\n  - All schemas definitions updated successfully")
 
 	metadata.Snapshots = append(metadata.Snapshots, newSnapshot)
 	if err := backupWriter.CommitSnapshot(newSnapshot.Id, metadata); err != nil {
