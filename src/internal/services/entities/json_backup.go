@@ -1,6 +1,10 @@
 package entities
 
-type JSONSchemaType struct {
+type JSONRefData struct {
+	PrevRef *string `json:"prevRef"`
+}
+
+type JSONSchemaData struct {
+	JSONRefData
 	SchemaType SchemaType `json:"schemaType"`
-	PrevRef    *string    `json:"prevRef"`
 }

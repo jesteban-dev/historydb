@@ -4,14 +4,16 @@ import (
 	"flag"
 	"fmt"
 	"historydb/src/internal/usecases"
-	"log/slog"
 	"net"
 	"net/url"
+	"os"
 	"strconv"
+
+	"github.com/sirupsen/logrus"
 )
 
 // BackupApp is the main execution for backup mode in the app
-func BackupApp(args []string, logger *slog.Logger) {
+func BackupApp(args []string) {
 	if len(args) < 1 {
 		printBackupHelp()
 		return
@@ -43,6 +45,12 @@ func BackupApp(args []string, logger *slog.Logger) {
 		dbPort, _ = strconv.Atoi(dsn.Port())
 	} else {
 		dbPort, _ = strconv.Atoi(port)
+	}
+
+	logger := &logrus.Logger{
+		Out:       os.Stdout,
+		Level:     logrus.InfoLevel,
+		Formatter: &logrus.TextFormatter{FullTimestamp: true},
 	}
 
 	dbFactory := createDatabaseFactory(engine, db, host, dbPort, dsn.Path[1:])

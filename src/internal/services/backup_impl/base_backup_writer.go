@@ -1,7 +1,7 @@
 package backup_impl
 
 import (
-	"historydb/src/internal/services/entities"
+	"historydb/src/internal/services"
 	"os"
 	"path/filepath"
 )
@@ -13,7 +13,7 @@ type BaseBackupWriter struct {
 func (writer *BaseBackupWriter) CreateBackupStructure() error {
 	_, err := os.Stat(writer.basePath)
 	if err == nil {
-		return entities.ErrBackupNeedEmptyDir
+		return services.ErrBackupDirExists
 	}
 
 	if err := os.Mkdir(writer.basePath, 0755); err != nil {
@@ -23,11 +23,9 @@ func (writer *BaseBackupWriter) CreateBackupStructure() error {
 	if err := os.Mkdir(filepath.Join(writer.basePath, "schemas"), 0755); err != nil {
 		return err
 	}
-
-	return err
+	return os.Mkdir(filepath.Join(writer.basePath, "schemas", "dependencies"), 0755)
 }
 
 func (writer *JSONBackupWriter) DeleteBackupStructure() error {
-	err := os.RemoveAll(writer.basePath)
-	return err
+	return os.RemoveAll(writer.basePath)
 }

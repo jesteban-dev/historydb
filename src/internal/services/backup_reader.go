@@ -8,5 +8,6 @@ import "historydb/src/internal/entities"
 // ReadSchema retrieve the full schema definition info from a schema file. If it is a diff file, it will build the full schema.
 type BackupReader interface {
 	ReadBackupMetadata() (entities.BackupMetadata, error)
+	ReadSchemaDependency(hash string) (entities.SchemaDependency, error)
 	ReadSchema(hash string) (entities.Schema, error)
 }

@@ -17,6 +17,39 @@ func NewJSONBackupWriter(basePath string) *JSONBackupWriter {
 	return &JSONBackupWriter{BaseBackupWriter: BaseBackupWriter{basePath}}
 }
 
+func (writer *JSONBackupWriter) WriteSchemaDependency(tempPath string, dependency entities.SchemaDependency) error {
+	hash, err := dependency.Hash()
+	if err != nil {
+		return err
+	}
+
+	content, err := json.Marshal(dependency)
+	if err != nil {
+		return err
+	}
+
+	pathToFile := filepath.Join(writer.basePath, tempPath, "schemas", "dependencies", fmt.Sprintf("%s.json", hash))
+	if err := os.MkdirAll(filepath.Dir(pathToFile), 0755); err != nil {
+		return err
+	}
+
+	return os.WriteFile(pathToFile, content, 0644)
+}
+
+func (writer *JSONBackupWriter) WriteSchemaDependencyDiff(tempPath string, dependencyDiff entities.SchemaDependencyDiff) error {
+	content, err := json.Marshal(dependencyDiff)
+	if err != nil {
+		return err
+	}
+
+	pathToFile := filepath.Join(writer.basePath, tempPath, "schemas", "dependencies", fmt.Sprintf("%s.json", dependencyDiff.GetDependencyHash()))
+	if err := os.MkdirAll(filepath.Dir(pathToFile), 0755); err != nil {
+		return err
+	}
+
+	return os.WriteFile(pathToFile, content, 0644)
+}
+
 func (writer *JSONBackupWriter) WriteSchema(tempPath string, schema entities.Schema) error {
 	hash, err := schema.Hash()
 	if err != nil {
@@ -30,7 +63,7 @@ func (writer *JSONBackupWriter) WriteSchema(tempPath string, schema entities.Sch
 
 	pathToFile := filepath.Join(writer.basePath, tempPath, "schemas", fmt.Sprintf("%s.json", hash))
 	if err := os.MkdirAll(filepath.Dir(pathToFile), 0755); err != nil {
-		return nil
+		return err
 	}
 
 	return os.WriteFile(pathToFile, content, 0644)
@@ -44,7 +77,7 @@ func (writer *JSONBackupWriter) WriteSchemaDiff(tempPath string, schemaDiff enti
 
 	pathToFile := filepath.Join(writer.basePath, tempPath, "schemas", fmt.Sprintf("%s.json", schemaDiff.GetSchemaHash()))
 	if err := os.MkdirAll(filepath.Dir(pathToFile), 0755); err != nil {
-		return nil
+		return err
 	}
 
 	return os.WriteFile(pathToFile, content, 0644)

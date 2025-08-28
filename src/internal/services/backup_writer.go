@@ -12,6 +12,8 @@ import "historydb/src/internal/entities"
 type BackupWriter interface {
 	CreateBackupStructure() error
 	DeleteBackupStructure() error
+	WriteSchemaDependency(tempPath string, dependency entities.SchemaDependency) error
+	WriteSchemaDependencyDiff(tempPath string, dependencyDiff entities.SchemaDependencyDiff) error
 	WriteSchema(tempPath string, schema entities.Schema) error
 	WriteSchemaDiff(tempPath string, schemaDiff entities.SchemaDiff) error
 	CommitSnapshot(tempPath string, metadata entities.BackupMetadata) error
