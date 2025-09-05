@@ -20,11 +20,11 @@ type PSQLTableSequence struct {
 	IsCalled  *bool   `json:"isCalled,omitempty"`
 }
 
-func (seq PSQLTableSequence) GetName() string {
+func (seq *PSQLTableSequence) GetName() string {
 	return seq.Name
 }
 
-func (seq PSQLTableSequence) Hash() (string, error) {
+func (seq *PSQLTableSequence) Hash() (string, error) {
 	json, err := json.Marshal(seq)
 	if err != nil {
 		return "", err
@@ -36,7 +36,7 @@ func (seq PSQLTableSequence) Hash() (string, error) {
 
 func (seq PSQLTableSequence) Diff(dependency entities.SchemaDependency) entities.SchemaDependencyDiff {
 	diff := PSQLTableSequenceDiff{}
-	oldSeq := dependency.(PSQLTableSequence)
+	oldSeq := dependency.(*PSQLTableSequence)
 
 	diff.dependencyHash, _ = seq.Hash()
 	diff.PrevRef, _ = dependency.Hash()
@@ -53,7 +53,7 @@ func (seq PSQLTableSequence) Diff(dependency entities.SchemaDependency) entities
 	return diff
 }
 
-func (seq PSQLTableSequence) ApplyDiff(diff entities.SchemaDependencyDiff) entities.SchemaDependency {
+func (seq *PSQLTableSequence) ApplyDiff(diff entities.SchemaDependencyDiff) entities.SchemaDependency {
 	updateSeq := seq
 	seqDiff := diff.(PSQLTableSequenceDiff)
 
