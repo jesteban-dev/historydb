@@ -7,14 +7,11 @@ import (
 )
 
 type PSQLDatabaseFactory struct {
-	db     *sql.DB
-	host   string
-	port   int
-	dbName string
+	db *sql.DB
 }
 
-func NewPSQLDatabaseFactory(db *sql.DB, host string, port int, dbName string) *PSQLDatabaseFactory {
-	return &PSQLDatabaseFactory{db, host, port, dbName}
+func NewPSQLDatabaseFactory(db *sql.DB) *PSQLDatabaseFactory {
+	return &PSQLDatabaseFactory{db}
 }
 
 func (factory *PSQLDatabaseFactory) CreateReader() services.DatabaseReader {

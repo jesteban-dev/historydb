@@ -4,10 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"historydb/src/internal/usecases"
-	"net"
 	"net/url"
 	"os"
-	"strconv"
 
 	"github.com/sirupsen/logrus"
 )
@@ -38,22 +36,13 @@ func BackupApp(args []string) {
 	}
 	defer db.Close()
 
-	dsn, _ := url.Parse(*connString)
-	host, port, _ := net.SplitHostPort(dsn.Host)
-	var dbPort int
-	if port == "" {
-		dbPort, _ = strconv.Atoi(dsn.Port())
-	} else {
-		dbPort, _ = strconv.Atoi(port)
-	}
-
 	logger := &logrus.Logger{
 		Out:       os.Stdout,
 		Level:     logrus.InfoLevel,
 		Formatter: &logrus.TextFormatter{FullTimestamp: true},
 	}
 
-	dbFactory := createDatabaseFactory(engine, db, host, dbPort, dsn.Path[1:])
+	dbFactory := createDatabaseFactory(engine, db)
 	backupFactory := createBackupFactory(*basePath)
 
 	backupUsecases := usecases.NewBackupUsecases(dbFactory, backupFactory, logger)
