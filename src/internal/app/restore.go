@@ -3,6 +3,7 @@ package app
 import (
 	"flag"
 	"fmt"
+	"historydb/src/internal/handlers"
 	"historydb/src/internal/helpers"
 	"historydb/src/internal/usecases"
 	"net/url"
@@ -48,8 +49,10 @@ func RestoreApp(args []string) {
 	dbFactory := createDatabaseFactory(engine, db)
 	backupFactory := createBackupFactory(*basePath)
 
-	restoreUsecases := usecases.NewRestoreUsecases(dbFactory, backupFactory, logger)
-	restoreUsecases.RestoreDatabase(snapshot)
+	restoreUsecases := usecases.NewRestoreUsecasesImpl(dbFactory, backupFactory, logger)
+
+	restoreHandler := handlers.NewRestoreHandler(restoreUsecases)
+	restoreHandler.RestoreDatabase(snapshot)
 }
 
 func checkSnapshot(snapshot string) (*string, error) {
