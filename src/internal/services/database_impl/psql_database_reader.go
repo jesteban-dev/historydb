@@ -164,7 +164,7 @@ func (dbReader *PSQLDatabaseReader) GetSchemaDataBatchAndChunkSize(schemaName st
 	return batchSize, chunkSize, nil
 }
 
-func (dbReader *PSQLDatabaseReader) GetSchemaDataChunk(schema entities.Schema, chunkSize uint, chunkCursor entities.ChunkCursor) ([]entities.SchemaData, entities.ChunkCursor, error) {
+func (dbReader *PSQLDatabaseReader) GetSchemaDataChunk(schema entities.Schema, chunkSize int, chunkCursor entities.ChunkCursor) (entities.SchemaDataChunk, entities.ChunkCursor, error) {
 	table := schema.(*serv_entities.SQLTable)
 	tableSchema, tableName := dbReader.parseTableName(table.TableName)
 
@@ -207,7 +207,7 @@ func (dbReader *PSQLDatabaseReader) GetSchemaDataChunk(schema entities.Schema, c
 		lastPKey = make([]interface{}, len(pKeys))
 	}
 
-	results := make([]entities.SchemaData, 0, chunkSize)
+	results := make([]serv_entities.TableRow, 0, chunkSize)
 	for rows.Next() {
 		values := make([]interface{}, numCols)
 		valuesPtrs := make([]interface{}, numCols)
@@ -220,7 +220,7 @@ func (dbReader *PSQLDatabaseReader) GetSchemaDataChunk(schema entities.Schema, c
 		}
 
 		// Save data in TableRow
-		row := make(serv_entities.TableRow, numCols)
+		row := make([]serv_entities.ColumnValue, numCols)
 		for i, col := range table.Columns {
 			var val interface{}
 			raw := values[i]
@@ -253,12 +253,14 @@ func (dbReader *PSQLDatabaseReader) GetSchemaDataChunk(schema entities.Schema, c
 			}
 		}
 
-		results = append(results, row)
+		results = append(results, serv_entities.TableRow{Data: row})
 	}
 
 	cursor.Offset += chunkSize
 	cursor.LastPK = lastPKey
-	return results, cursor, nil
+	return &serv_entities.TableRowChunk{
+		Content: results,
+	}, cursor, nil
 }
 
 // As PSQL has schemes and our Schema names for this language is composed as <scheme-name>.<table-name>,

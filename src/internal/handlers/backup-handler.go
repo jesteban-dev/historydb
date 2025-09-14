@@ -20,8 +20,15 @@ func (handler *BackupHandler) CreateBackup() {
 		return
 	}
 
-	if ok := handler.backupUc.BackupSchemas(snapshot); !ok {
+	schemas, ok := handler.backupUc.BackupSchemas(snapshot)
+	if !ok {
 		return
+	}
+
+	for _, schema := range schemas {
+		if ok := handler.backupUc.BackupSchemaData(snapshot, schema); !ok {
+			return
+		}
 	}
 
 	handler.backupUc.CommitSnapshot(nil, snapshot, true)

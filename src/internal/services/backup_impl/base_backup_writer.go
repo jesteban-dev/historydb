@@ -23,7 +23,10 @@ func (writer *BaseBackupWriter) CreateBackupStructure() error {
 	if err := os.Mkdir(filepath.Join(writer.basePath, "schemas"), 0755); err != nil {
 		return err
 	}
-	return os.Mkdir(filepath.Join(writer.basePath, "schemas", "dependencies"), 0755)
+	if err := os.Mkdir(filepath.Join(writer.basePath, "schemas", "dependencies"), 0755); err != nil {
+		return err
+	}
+	return os.Mkdir(filepath.Join(writer.basePath, "data"), 0755)
 }
 
 func (writer *JSONBackupWriter) DeleteBackupStructure() error {

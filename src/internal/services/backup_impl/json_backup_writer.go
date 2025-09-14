@@ -83,6 +83,30 @@ func (writer *JSONBackupWriter) WriteSchemaDiff(tempPath string, schemaDiff enti
 	return os.WriteFile(pathToFile, content, 0644)
 }
 
+func (writer *JSONBackupWriter) WriteSchemaDataChunk(tempPath, tempFile string, chunk entities.SchemaDataChunk) error {
+	pathToFile := filepath.Join(writer.basePath, tempPath, "data", fmt.Sprintf("%s.jsonl", tempFile))
+	if err := os.MkdirAll(filepath.Dir(pathToFile), 0755); err != nil {
+		return err
+	}
+
+	f, err := os.OpenFile(pathToFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	encoder := json.NewEncoder(f)
+	err = encoder.Encode(chunk)
+	return err
+}
+
+func (writer *JSONBackupWriter) WriteSchemaDataBatch(tempPath, tempFile, filename string) error {
+	oldPath := filepath.Join(writer.basePath, tempPath, "data", fmt.Sprintf("%s.jsonl", tempFile))
+	newPath := filepath.Join(writer.basePath, tempPath, "data", fmt.Sprintf("%s.jsonl", filename))
+	err := os.Rename(oldPath, newPath)
+	return err
+}
+
 func (writer *JSONBackupWriter) CommitSnapshot(tempPath string, metadata entities.BackupMetadata) error {
 	// Rename every file inside <uuid-snapshot> directory to root directory, as Rename is an atomic function
 	tempDir := filepath.Join(writer.basePath, tempPath)

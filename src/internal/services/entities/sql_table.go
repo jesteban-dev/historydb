@@ -248,32 +248,76 @@ func (idx1 SQLTableIndex) equal(idx2 SQLTableIndex) bool {
 	return idx1.Name == idx2.Name && idx1.Type == idx2.Type
 }
 
+type TableRowChunk struct {
+	HashValue string     `json:"hash"`
+	Content   []TableRow `json:"content"`
+}
+
+func (chunk *TableRowChunk) Hash() (string, error) {
+	if chunk.HashValue == "" {
+		data := make([][]ColumnValue, 0, len(chunk.Content))
+		for _, row := range chunk.Content {
+			data = append(data, row.Data)
+		}
+
+		json, err := json.Marshal(data)
+		if err != nil {
+			return "", err
+		}
+
+		hashValue := sha256.Sum256(json)
+		chunk.HashValue = hex.EncodeToString(hashValue[:])
+	}
+
+	return chunk.HashValue, nil
+}
+
+func (chunk *TableRowChunk) HashContent() error {
+	for i := 0; i < len(chunk.Content); i++ {
+		if _, err := chunk.Content[i].Hash(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (chunk *TableRowChunk) Length() int {
+	return len(chunk.Content)
+}
+
 // TableRow is the struct used in SQL languages to save a table row data.
-type TableRow []ColumnValue
+type TableRow struct {
+	HashValue string        `json:"hash"`
+	Data      []ColumnValue `json:"data"`
+}
 
 type ColumnValue struct {
 	Column string      `json:"column"`
 	Value  interface{} `json:"value"`
 }
 
-func (row TableRow) Hash() (string, error) {
-	sorted := make(TableRow, len(row))
-	copy(sorted, row)
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].Column < sorted[j].Column
-	})
+func (row *TableRow) Hash() (string, error) {
+	if row.HashValue == "" {
+		sorted := make([]ColumnValue, len(row.Data))
+		copy(sorted, row.Data)
+		sort.Slice(sorted, func(i, j int) bool {
+			return sorted[i].Column < sorted[j].Column
+		})
 
-	json, err := json.Marshal(sorted)
-	if err != nil {
-		return "", err
+		json, err := json.Marshal(sorted)
+		if err != nil {
+			return "", err
+		}
+
+		hashValue := sha256.Sum256(json)
+		row.HashValue = hex.EncodeToString(hashValue[:])
 	}
 
-	hashValue := sha256.Sum256(json)
-	return hex.EncodeToString(hashValue[:]), nil
+	return row.HashValue, nil
 }
 
 // SQLChunkCursor is the struct used in SQL languages to chunk the data queries in a table.
 type SQLChunkCursor struct {
-	Offset uint
+	Offset int
 	LastPK interface{}
 }
