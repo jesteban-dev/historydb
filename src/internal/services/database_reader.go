@@ -1,6 +1,8 @@
 package services
 
-import "historydb/src/internal/entities"
+import (
+	"historydb/src/internal/entities"
+)
 
 // DatabaseReader is the interface that defines the components that will read the databases.
 //
@@ -11,4 +13,7 @@ type DatabaseReader interface {
 	ListSchemaNames() ([]string, error)
 	ListSchemaDependencies() ([]entities.SchemaDependency, error)
 	GetSchemaDefinition(schemaName string) (entities.Schema, error)
+	GetSchemaDataLength(schemaName string) (int, error)
+	GetSchemaDataBatchAndChunkSize(schemaName string) (int, int, error)
+	GetSchemaDataChunk(schema entities.Schema, chunkSize uint, chunkCursor entities.ChunkCursor) ([]entities.SchemaData, entities.ChunkCursor, error)
 }

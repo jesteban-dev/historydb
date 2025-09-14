@@ -4,8 +4,12 @@ import (
 	"database/sql"
 	"fmt"
 	"historydb/src/internal/entities"
+	"historydb/src/internal/helpers"
+	"historydb/src/internal/services/database_impl/utils"
 	serv_entities "historydb/src/internal/services/entities"
+	"math"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/lib/pq"
@@ -125,6 +129,136 @@ func (dbReader *PSQLDatabaseReader) GetSchemaDefinition(schemaName string) (enti
 		ForeignKeys: foreignKeys,
 		Indexes:     indexes,
 	}, nil
+}
+
+func (dbReader *PSQLDatabaseReader) GetSchemaDataLength(schemaName string) (int, error) {
+	tableSchema, tableName := dbReader.parseTableName(schemaName)
+
+	var count int
+	query := fmt.Sprintf("SELECT COUNT(*) FROM %s.%s", pq.QuoteIdentifier(tableSchema), pq.QuoteIdentifier(tableName))
+	if err := dbReader.db.QueryRow(query).Scan(&count); err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func (dbReader *PSQLDatabaseReader) GetSchemaDataBatchAndChunkSize(schemaName string) (int, int, error) {
+	tableSchema, tableName := dbReader.parseTableName(schemaName)
+
+	var maxRowSize int
+	query := fmt.Sprintf("SELECT MAX(pg_column_size(t)) AS max_row_size FROM %s.%s AS t", tableSchema, tableName)
+	if err := dbReader.db.QueryRow(query).Scan(&maxRowSize); err != nil {
+		return 0, 0, err
+	}
+
+	var batchSize, chunkSize int
+	if maxRowSize < entities.LIMIT_DATA_SIZE {
+		batchSize = int(math.Min(float64(entities.SMALL_FILE_SIZE)/float64(maxRowSize), float64(entities.MAX_BATCH_LENGTH)))
+		chunkSize = batchSize / 100
+	} else {
+		batchSize = int(entities.BIG_FILE_SIZE / maxRowSize)
+		chunkSize = batchSize / 10
+	}
+
+	return batchSize, chunkSize, nil
+}
+
+func (dbReader *PSQLDatabaseReader) GetSchemaDataChunk(schema entities.Schema, chunkSize uint, chunkCursor entities.ChunkCursor) ([]entities.SchemaData, entities.ChunkCursor, error) {
+	table := schema.(*serv_entities.SQLTable)
+	tableSchema, tableName := dbReader.parseTableName(table.TableName)
+
+	// Initializes chunk cursor if it is first iteration
+	cursor, ok := chunkCursor.(*serv_entities.SQLChunkCursor)
+	if !ok || cursor == nil {
+		cursor = &serv_entities.SQLChunkCursor{}
+	}
+
+	var rows *sql.Rows
+	var err error
+	pKeys, ok := utils.ExtractPrimaryKey(*table)
+	if !ok {
+		// If table does not have primary keys, it queries the table using offset
+		query := fmt.Sprintf("SELECT * FROM %s.%s ORDER BY ctid LIMIT $1 OFFSET $2", pq.QuoteIdentifier(tableSchema), pq.QuoteIdentifier(tableName))
+		rows, err = dbReader.db.Query(query, chunkSize, cursor.Offset)
+	} else {
+		// If table has primary keys, it queries the table using the for optimization
+		orderClause := fmt.Sprintf("ORDER BY %s", strings.Join(utils.QuoteIdentifiers(pKeys), ", "))
+
+		if cursor.LastPK == nil {
+			// No where clause since it is first chunk
+			query := fmt.Sprintf("SELECT * FROM %s.%s %s LIMIT $1", pq.QuoteIdentifier(tableSchema), pq.QuoteIdentifier(tableName), orderClause)
+			rows, err = dbReader.db.Query(query, chunkSize)
+		} else {
+			whereClause := utils.BuildPKWhereClause(pKeys, cursor.LastPK)
+			query := fmt.Sprintf("SELECT * FROM %s.%s WHERE %s %s LIMIT $%d", pq.QuoteIdentifier(tableSchema), pq.QuoteIdentifier(tableName), whereClause, orderClause, len(pKeys)+1)
+			args := append(helpers.ToInterfaceSlice(cursor.LastPK), chunkSize)
+			rows, err = dbReader.db.Query(query, args...)
+		}
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+
+	numCols := len(table.Columns)
+	var lastPKey []interface{} = nil
+	if pKeys != nil {
+		lastPKey = make([]interface{}, len(pKeys))
+	}
+
+	results := make([]entities.SchemaData, 0, chunkSize)
+	for rows.Next() {
+		values := make([]interface{}, numCols)
+		valuesPtrs := make([]interface{}, numCols)
+		for i := range values {
+			valuesPtrs[i] = &values[i]
+		}
+
+		if err := rows.Scan(valuesPtrs...); err != nil {
+			return nil, nil, err
+		}
+
+		// Save data in TableRow
+		row := make(serv_entities.TableRow, numCols)
+		for i, col := range table.Columns {
+			var val interface{}
+			raw := values[i]
+
+			b, ok := raw.([]byte)
+			if ok {
+				if col.Type == "bytea" {
+					val = b
+				} else if strings.HasPrefix(col.Type, "numeric") {
+					val, _ = strconv.ParseFloat(string(b), 64)
+				} else {
+					val = string(b)
+				}
+			} else {
+				val = raw
+			}
+
+			row[i] = serv_entities.ColumnValue{
+				Column: col.Name,
+				Value:  val,
+			}
+		}
+
+		// Updates lastPK
+		for i, key := range pKeys {
+			for _, kv := range row {
+				if key == kv.Column {
+					lastPKey[i] = kv.Value
+				}
+			}
+		}
+
+		results = append(results, row)
+	}
+
+	cursor.Offset += chunkSize
+	cursor.LastPK = lastPKey
+	return results, cursor, nil
 }
 
 // As PSQL has schemes and our Schema names for this language is composed as <scheme-name>.<table-name>,
