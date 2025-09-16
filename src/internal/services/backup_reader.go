@@ -10,4 +10,6 @@ type BackupReader interface {
 	ReadBackupMetadata() (entities.BackupMetadata, error)
 	ReadSchemaDependency(hash string) (entities.SchemaDependency, error)
 	ReadSchema(hash string) (entities.Schema, error)
+	ReadSchemaDataBatchChunks(hash string) ([]string, error)
+	ReadSchemaDataChunk(hash, chunkHash string) (entities.SchemaDataChunk, error)
 }

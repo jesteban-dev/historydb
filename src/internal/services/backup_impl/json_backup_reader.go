@@ -1,9 +1,11 @@
 package backup_impl
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"historydb/src/internal/entities"
+	"historydb/src/internal/helpers"
 	serv_entities "historydb/src/internal/services/entities"
 	"os"
 	"path/filepath"
@@ -96,6 +98,73 @@ func (reader *JSONBackupReader) ReadSchema(hash string) (entities.Schema, error)
 	}
 }
 
+func (reader *JSONBackupReader) ReadSchemaDataBatchChunks(hash string) ([]string, error) {
+	dataPath := filepath.Join(reader.basePath, "data", fmt.Sprintf("%s.jsonl", hash))
+	file, err := os.Open(dataPath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var chunks []string
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		var hash serv_entities.JSONDataChunkRef
+		line := scanner.Bytes()
+
+		if err := json.Unmarshal(line, &hash); err != nil {
+			return nil, err
+		}
+		chunks = append(chunks, hash.Hash)
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return chunks, nil
+}
+
+func (reader *JSONBackupReader) ReadSchemaDataChunk(hash, chunkHash string) (entities.SchemaDataChunk, error) {
+	dataPath := filepath.Join(reader.basePath, "data", fmt.Sprintf("%s.jsonl", hash))
+	file, err := os.Open(dataPath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		var hash serv_entities.JSONDataChunkRef
+		line := scanner.Bytes()
+
+		if err := json.Unmarshal(line, &hash); err != nil {
+			return nil, err
+		}
+
+		if helpers.CompareHashes(hash.Hash, chunkHash) {
+			if hash.PrevRef != nil {
+				chunk, err := reader.ReadSchemaDataChunk(hash.PrevRef.Batch, hash.PrevRef.Chunk)
+				if err != nil {
+					return chunk, err
+				}
+
+				chunkDiff, err := reader.readDataDiffByType(hash.SchemaType, line)
+				if err != nil {
+					return chunk, err
+				}
+				chunk = chunk.ApplyDiff(chunkDiff)
+
+				return chunk, nil
+			} else {
+				return reader.readDataByType(hash.SchemaType, line)
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("data chunk not found")
+}
+
 func (reader *JSONBackupReader) readSchemaByType(schemaType serv_entities.SchemaType, content []byte) (entities.Schema, error) {
 	switch schemaType {
 	case serv_entities.Relational:
@@ -113,6 +182,28 @@ func (reader *JSONBackupReader) readSchemaDiffByType(schemaType serv_entities.Sc
 		sqlTableDiff := serv_entities.SQLTableDiff{}
 		err := json.Unmarshal(content, &sqlTableDiff)
 		return &sqlTableDiff, err
+	default:
+		return nil, fmt.Errorf("unsupported schema type")
+	}
+}
+
+func (reader *JSONBackupReader) readDataByType(schemaType serv_entities.SchemaType, content []byte) (entities.SchemaDataChunk, error) {
+	switch schemaType {
+	case serv_entities.Relational:
+		sqlChunk := serv_entities.TableRowChunk{}
+		err := json.Unmarshal(content, &sqlChunk)
+		return &sqlChunk, err
+	default:
+		return nil, fmt.Errorf("unsupported schema type")
+	}
+}
+
+func (reader *JSONBackupReader) readDataDiffByType(schemaType serv_entities.SchemaType, content []byte) (entities.SchemaDataChunkDiff, error) {
+	switch schemaType {
+	case serv_entities.Relational:
+		sqlChunkDiff := serv_entities.TableRowChunkDiff{}
+		err := json.Unmarshal(content, &sqlChunkDiff)
+		return &sqlChunkDiff, err
 	default:
 		return nil, fmt.Errorf("unsupported schema type")
 	}

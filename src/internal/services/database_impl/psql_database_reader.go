@@ -259,7 +259,8 @@ func (dbReader *PSQLDatabaseReader) GetSchemaDataChunk(schema entities.Schema, c
 	cursor.Offset += chunkSize
 	cursor.LastPK = lastPKey
 	return &serv_entities.TableRowChunk{
-		Content: results,
+		SchemaType: serv_entities.Relational,
+		Content:    results,
 	}, cursor, nil
 }
 

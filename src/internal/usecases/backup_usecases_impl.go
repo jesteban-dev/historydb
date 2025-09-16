@@ -8,6 +8,7 @@ import (
 	"historydb/src/internal/entities"
 	"historydb/src/internal/helpers"
 	"historydb/src/internal/services"
+	"historydb/src/internal/usecases/dtos"
 	"math"
 	"os"
 	"strings"
@@ -33,7 +34,7 @@ func NewBackupUsecasesImpl(dbFactory services.DatabaseFactory, backupFactory ser
 func (uc *BackupUsecasesImpl) CreateSnapshot(newBackup bool) *entities.BackupSnapshot {
 	backupWriter := uc.backupFactory.CreateWriter()
 
-	snapshot := entities.BackupSnapshot{Id: uuid.NewString(), Timestamp: time.Now(), SchemaDependencies: make(map[string]string), Schemas: make(map[string]string), Data: make(map[string][]string)}
+	snapshot := entities.BackupSnapshot{Id: uuid.NewString(), Timestamp: time.Now(), SchemaDependencies: make(map[string]string), Schemas: make(map[string]string), Data: make(map[string]entities.BackupSnapshotData)}
 	if newBackup {
 		if err := backupWriter.CreateBackupStructure(); err != nil {
 			if errors.Is(err, services.ErrBackupDirExists) {
@@ -350,7 +351,123 @@ func (uc *BackupUsecasesImpl) BackupSchemaData(snapshot *entities.BackupSnapshot
 	}
 	fmt.Println("  - All schema data saved successfully")
 
-	snapshot.Data[schema.GetName()] = batchHashes
+	snapshot.Data[schema.GetName()] = entities.BackupSnapshotData{
+		BatchSize: batchSize,
+		ChunkSize: chunkSize,
+		Data:      batchHashes,
+	}
+	return true
+}
+
+func (uc *BackupUsecasesImpl) SnapshotSchemaData(lastSnapshot, snapshot *entities.BackupSnapshot, schema entities.Schema) bool {
+	dbReader := uc.dbFactory.CreateReader()
+	backupReader := uc.backupFactory.CreateReader()
+	backupWriter := uc.backupFactory.CreateWriter()
+
+	schemaMetadata := lastSnapshot.Data[schema.GetName()]
+
+	dataLength, err := dbReader.GetSchemaDataLength(schema.GetName())
+	if err != nil {
+		uc.logger.Errorf("could not get total schema data length: %v\n", err)
+		uc.rollbackBackup(snapshot.Id, backupWriter)
+		return false
+	}
+
+	dataSaved := 0
+	batchIndex := 0
+	for dataSaved < dataLength {
+		currentBatchSize := 0
+		batchHash := sha256.New()
+		batchChunks := []dtos.BatchChunkInfo{}
+
+		var cursor entities.ChunkCursor = nil
+		for currentBatchSize < schemaMetadata.BatchSize {
+			data, nextCursor, err := dbReader.GetSchemaDataChunk(schema, schemaMetadata.ChunkSize, cursor)
+			if err != nil {
+				uc.logger.Errorf("could not retrieve data chunk from %s schema: %v\n", schema.GetName(), err)
+				uc.rollbackBackup(snapshot.Id, backupWriter)
+				return false
+			}
+
+			if data.Length() == 0 {
+				break
+			} else {
+				currentBatchSize += data.Length()
+			}
+
+			chunkHash, err := data.Hash()
+			if err != nil {
+				uc.logger.Errorf("could not hash chunk: %v\n", err)
+				uc.rollbackBackup(snapshot.Id, backupWriter)
+				return false
+			}
+
+			batchChunks = append(batchChunks, dtos.BatchChunkInfo{
+				Hash:   chunkHash,
+				Cursor: cursor,
+			})
+			cursor = nextCursor
+			batchHash.Write([]byte(chunkHash))
+			batchHash.Write([]byte("|"))
+		}
+
+		batchHashString := hex.EncodeToString(batchHash.Sum(nil))
+		if len(schemaMetadata.Data) > batchIndex {
+			// Compare Batch hashes, if it is equal we continue to the next batch
+			if !helpers.CompareHashes(schemaMetadata.Data[batchIndex], batchHashString) {
+				// Compare each chunk hash
+				// What if DB Chunks > Backup Chunks
+				// What if DB Chunks < Backup Chunks
+				backupChunks, err := backupReader.ReadSchemaDataBatchChunks(schemaMetadata.Data[batchIndex])
+				if err != nil {
+					uc.logger.Errorf("could not retrieve chunks from backup batch in %s schema: %v\n", schema.GetName(), err)
+					uc.rollbackBackup(snapshot.Id, backupWriter)
+					return false
+				}
+
+				for i := 0; i < int(math.Max(float64(len(backupChunks)), float64(len(batchChunks)))); i++ {
+					if len(backupChunks) <= i {
+						// Chunk does not exist in backupChunks -> New chunk to add
+						_, _, err := dbReader.GetSchemaDataChunk(schema, schemaMetadata.ChunkSize, batchChunks[i].Cursor)
+						if err != nil {
+							uc.logger.Errorf("could not retrieve data chunk from %s schema: %v\n", schema.GetName(), err)
+							uc.rollbackBackup(snapshot.Id, backupWriter)
+							return false
+						}
+						// Write chunk in backup with new hash, no old hash?
+					} else if len(batchChunks) <= i {
+						// Chunk does not exist in batchChunks -> Old chunk to delete
+						_, err := backupReader.ReadSchemaDataChunk(schemaMetadata.Data[batchIndex], backupChunks[i])
+						if err != nil {
+							uc.logger.Errorf("coudl not retrieve data chunk from backup: %v\n", err)
+							uc.rollbackBackup(snapshot.Id, backupWriter)
+							return false
+						}
+						// Write chunk diff with no new hash to delete ?
+					} else if len(backupChunks) > i && len(batchChunks) > i && !helpers.CompareHashes(backupChunks[i], batchChunks[i].Hash) {
+						// Chunks does not match -> Replace chunk data
+						_, _, err := dbReader.GetSchemaDataChunk(schema, schemaMetadata.ChunkSize, batchChunks[i].Cursor)
+						if err != nil {
+							uc.logger.Errorf("could not retrieve data chunk from %s schema: %v\n", schema.GetName(), err)
+							uc.rollbackBackup(snapshot.Id, backupWriter)
+							return false
+						}
+
+						_, err = backupReader.ReadSchemaDataChunk(schemaMetadata.Data[batchIndex], backupChunks[i])
+						if err != nil {
+							uc.logger.Errorf("coudl not retrieve data chunk from backup: %v\n", err)
+							uc.rollbackBackup(snapshot.Id, backupWriter)
+							return false
+						}
+
+						// Write diff between batches
+					}
+				}
+			}
+			batchIndex++
+		}
+	}
+
 	return true
 }
 

@@ -107,6 +107,10 @@ func (writer *JSONBackupWriter) WriteSchemaDataBatch(tempPath, tempFile, filenam
 	return err
 }
 
+func (writer *JSONBackupWriter) WriteSchemaDataChunkDiff(tempPath, tempFile string, chunk entities.SchemaDataChunkDiff) error {
+	return nil
+}
+
 func (writer *JSONBackupWriter) CommitSnapshot(tempPath string, metadata entities.BackupMetadata) error {
 	// Rename every file inside <uuid-snapshot> directory to root directory, as Rename is an atomic function
 	tempDir := filepath.Join(writer.basePath, tempPath)
