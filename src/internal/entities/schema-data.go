@@ -1,6 +1,6 @@
 package entities
 
-var LIMIT_DATA_SIZE = 10 * 1024 * 1024 // 10 MB
+/*var LIMIT_DATA_SIZE = 10 * 1024 * 1024 // 10 MB
 var MAX_BATCH_LENGTH = 100000
 
 var SMALL_FILE_SIZE = 20 * 1024 * 1024 // 20 MB
@@ -23,3 +23,4 @@ type SchemaData interface {
 
 // ChunkCursor is an interface that represents a Cursor to make chunk queries to a database scheme.
 type ChunkCursor interface{}
+*/
