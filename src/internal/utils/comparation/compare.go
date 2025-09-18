@@ -11,3 +11,9 @@ func AssignIfChanged[T comparable](dst **T, new, old *T) {
 		*dst = new
 	}
 }
+
+func AssignIfNotNil[T comparable](dst, org *T) {
+	if org != nil {
+		*dst = *org
+	}
+}

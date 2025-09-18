@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"historydb/src/internal/entities"
 	"historydb/src/internal/utils/comparation"
+	"historydb/src/internal/utils/decode"
 	"historydb/src/internal/utils/encode"
 )
 
@@ -14,18 +15,21 @@ const (
 )
 
 type PSQLSequence struct {
-	hash           string
 	DependencyType entities.DependencyType
 	Version        string
 	Name           string
-	Type           *string
-	Start          *int
-	Min            *int
-	Max            *int
-	Increment      *int
-	IsCycle        *bool
-	LastValue      *int
-	IsCalled       *bool
+	Type           string
+	Start          int
+	Min            int
+	Max            int
+	Increment      int
+	IsCycle        bool
+	LastValue      int
+	IsCalled       bool
+}
+
+func (seq *PSQLSequence) GetDependencyType() entities.DependencyType {
+	return seq.DependencyType
 }
 
 func (seq *PSQLSequence) GetName() string {
@@ -33,28 +37,25 @@ func (seq *PSQLSequence) GetName() string {
 }
 
 func (seq *PSQLSequence) Hash() string {
-	if seq.hash == "" {
-		hash := sha256.Sum256(seq.encodeData())
-		seq.hash = hex.EncodeToString(hash[:])
-	}
-	return seq.hash
+	hash := sha256.Sum256(seq.encodeData())
+	return hex.EncodeToString(hash[:])
 }
 
 func (seq *PSQLSequence) Diff(dependency entities.SchemaDependency) entities.SchemaDependencyDiff {
 	oldSeq := dependency.(*PSQLSequence)
 
 	diff := PSQLSequenceDiff{
-		sequenceHash: seq.Hash(),
-		PrevRef:      dependency.Hash(),
+		hash:    seq.Hash(),
+		PrevRef: dependency.Hash(),
 	}
-	comparation.AssignIfChanged(&diff.Type, seq.Type, oldSeq.Type)
-	comparation.AssignIfChanged(&diff.Start, seq.Start, oldSeq.Start)
-	comparation.AssignIfChanged(&diff.Min, seq.Min, oldSeq.Min)
-	comparation.AssignIfChanged(&diff.Max, seq.Max, oldSeq.Max)
-	comparation.AssignIfChanged(&diff.Increment, seq.Increment, oldSeq.Increment)
-	comparation.AssignIfChanged(&diff.IsCycle, seq.IsCycle, oldSeq.IsCycle)
-	comparation.AssignIfChanged(&diff.LastValue, seq.LastValue, oldSeq.LastValue)
-	comparation.AssignIfChanged(&diff.IsCalled, seq.IsCalled, oldSeq.IsCalled)
+	comparation.AssignIfChanged(&diff.Type, &seq.Type, &oldSeq.Type)
+	comparation.AssignIfChanged(&diff.Start, &seq.Start, &oldSeq.Start)
+	comparation.AssignIfChanged(&diff.Min, &seq.Min, &oldSeq.Min)
+	comparation.AssignIfChanged(&diff.Max, &seq.Max, &oldSeq.Max)
+	comparation.AssignIfChanged(&diff.Increment, &seq.Increment, &oldSeq.Increment)
+	comparation.AssignIfChanged(&diff.IsCycle, &seq.IsCycle, &oldSeq.IsCycle)
+	comparation.AssignIfChanged(&diff.LastValue, &seq.LastValue, &oldSeq.LastValue)
+	comparation.AssignIfChanged(&diff.IsCalled, &seq.IsCalled, &oldSeq.IsCalled)
 
 	return &diff
 }
@@ -63,14 +64,14 @@ func (seq *PSQLSequence) ApplyDiff(diff entities.SchemaDependencyDiff) entities.
 	updateSeq := *seq
 	seqDiff := diff.(*PSQLSequenceDiff)
 
-	comparation.AssignIfChanged(&updateSeq.Type, seqDiff.Type, nil)
-	comparation.AssignIfChanged(&updateSeq.Start, seqDiff.Start, nil)
-	comparation.AssignIfChanged(&updateSeq.Min, seqDiff.Min, nil)
-	comparation.AssignIfChanged(&updateSeq.Max, seqDiff.Max, nil)
-	comparation.AssignIfChanged(&updateSeq.Increment, seqDiff.Increment, nil)
-	comparation.AssignIfChanged(&updateSeq.IsCycle, seqDiff.IsCycle, nil)
-	comparation.AssignIfChanged(&updateSeq.LastValue, seqDiff.LastValue, nil)
-	comparation.AssignIfChanged(&updateSeq.IsCalled, seqDiff.IsCalled, nil)
+	comparation.AssignIfNotNil(&updateSeq.Type, seqDiff.Type)
+	comparation.AssignIfNotNil(&updateSeq.Start, seqDiff.Start)
+	comparation.AssignIfNotNil(&updateSeq.Min, seqDiff.Min)
+	comparation.AssignIfNotNil(&updateSeq.Max, seqDiff.Max)
+	comparation.AssignIfNotNil(&updateSeq.Increment, seqDiff.Increment)
+	comparation.AssignIfNotNil(&updateSeq.IsCycle, seqDiff.IsCycle)
+	comparation.AssignIfNotNil(&updateSeq.LastValue, seqDiff.LastValue)
+	comparation.AssignIfNotNil(&updateSeq.IsCalled, seqDiff.IsCalled)
 
 	return &updateSeq
 }
@@ -87,69 +88,105 @@ func (seq *PSQLSequence) EncodeToBytes() []byte {
 	return buf.Bytes()
 }
 
+func (seq *PSQLSequence) DecodeFromBytes(data []byte) error {
+	buf := bytes.NewBuffer(data)
+
+	dependencyType, err := decode.DecodeString(buf)
+	if err != nil {
+		return err
+	}
+	version, err := decode.DecodeString(buf)
+	if err != nil {
+		return err
+	}
+	name, err := decode.DecodeString(buf)
+	if err != nil {
+		return err
+	}
+	typeData, err := decode.DecodeString(buf)
+	if err != nil {
+		return err
+	}
+	start, err := decode.DecodeInt(buf)
+	if err != nil {
+		return err
+	}
+	min, err := decode.DecodeInt(buf)
+	if err != nil {
+		return err
+	}
+	max, err := decode.DecodeInt(buf)
+	if err != nil {
+		return err
+	}
+	increment, err := decode.DecodeInt(buf)
+	if err != nil {
+		return err
+	}
+	isCycle, err := decode.DecodeBool(buf)
+	if err != nil {
+		return err
+	}
+	lastValue, err := decode.DecodeInt(buf)
+	if err != nil {
+		return err
+	}
+	isCalled, err := decode.DecodeBool(buf)
+	if err != nil {
+		return err
+	}
+
+	seq.DependencyType = entities.DependencyType(*dependencyType)
+	seq.Version = *version
+	seq.Name = *name
+	seq.Type = *typeData
+	seq.Start = *start
+	seq.Min = *min
+	seq.Max = *max
+	seq.Increment = *increment
+	seq.IsCycle = *isCycle
+	seq.LastValue = *lastValue
+	seq.IsCalled = *isCalled
+	return nil
+}
+
 func (seq *PSQLSequence) encodeData() []byte {
 	var buf bytes.Buffer
 
 	encode.EncodeString(&buf, (*string)(&seq.DependencyType))
 	encode.EncodeString(&buf, &seq.Version)
-	buf.WriteByte(seq.getByteFlags())
 	encode.EncodeString(&buf, &seq.Name)
-	encode.EncodeString(&buf, seq.Type)
-	encode.EncodeInt(&buf, seq.Start)
-	encode.EncodeInt(&buf, seq.Min)
-	encode.EncodeInt(&buf, seq.Max)
-	encode.EncodeInt(&buf, seq.Increment)
-	encode.EncodeBool(&buf, seq.IsCycle)
-	encode.EncodeInt(&buf, seq.LastValue)
-	encode.EncodeBool(&buf, seq.IsCalled)
+	encode.EncodeString(&buf, &seq.Type)
+	encode.EncodeInt(&buf, &seq.Start)
+	encode.EncodeInt(&buf, &seq.Min)
+	encode.EncodeInt(&buf, &seq.Max)
+	encode.EncodeInt(&buf, &seq.Increment)
+	encode.EncodeBool(&buf, &seq.IsCycle)
+	encode.EncodeInt(&buf, &seq.LastValue)
+	encode.EncodeBool(&buf, &seq.IsCalled)
 
 	return buf.Bytes()
 }
 
-func (seq *PSQLSequence) getByteFlags() byte {
-	var flags byte
-	if seq.Type != nil {
-		flags |= 1 << 0
-	}
-	if seq.Start != nil {
-		flags |= 1 << 1
-	}
-	if seq.Min != nil {
-		flags |= 1 << 2
-	}
-	if seq.Max != nil {
-		flags |= 1 << 3
-	}
-	if seq.Increment != nil {
-		flags |= 1 << 4
-	}
-	if seq.IsCycle != nil {
-		flags |= 1 << 5
-	}
-	if seq.LastValue != nil {
-		flags |= 1 << 6
-	}
-	if seq.IsCalled != nil {
-		flags |= 1 << 7
-	}
-	return flags
-}
-
 type PSQLSequenceDiff struct {
-	sequenceHash string
-	PrevRef      string
-	Type         *string
-	Start        *int
-	Min          *int
-	Max          *int
-	Increment    *int
-	IsCycle      *bool
-	LastValue    *int
-	IsCalled     *bool
+	hash      string
+	PrevRef   string
+	Type      *string
+	Start     *int
+	Min       *int
+	Max       *int
+	Increment *int
+	IsCycle   *bool
+	LastValue *int
+	IsCalled  *bool
 }
 
-func (diff *PSQLSequenceDiff) GetSchemaDependencyHash() string {
-	return diff.sequenceHash
+func (diff *PSQLSequenceDiff) Hash() string {
+	return diff.hash
+}
+
+func (diff *PSQLSequenceDiff) GetPrevRef() string {
+	return diff.PrevRef
 }
 
 func (diff *PSQLSequenceDiff) EncodeToBytes() []byte {
@@ -162,6 +199,86 @@ func (diff *PSQLSequenceDiff) EncodeToBytes() []byte {
 	buf.Write(encodedData)
 
 	return buf.Bytes()
+}
+
+func (diff *PSQLSequenceDiff) DecodeFromBytes(data []byte) error {
+	buf := bytes.NewBuffer(data)
+
+	prevRef, err := decode.DecodeString(buf)
+	if err != nil {
+		return err
+	}
+	flags, err := buf.ReadByte()
+	if err != nil {
+		return err
+	}
+	var typeData *string
+	if flags&(1<<0) != 0 {
+		typeData, err = decode.DecodeString(buf)
+		if err != nil {
+			return err
+		}
+	}
+	var start *int
+	if flags&(1<<1) != 0 {
+		start, err = decode.DecodeInt(buf)
+		if err != nil {
+			return err
+		}
+	}
+	var min *int
+	if flags&(1<<2) != 0 {
+		min, err = decode.DecodeInt(buf)
+		if err != nil {
+			return err
+		}
+	}
+	var max *int
+	if flags&(1<<3) != 0 {
+		max, err = decode.DecodeInt(buf)
+		if err != nil {
+			return err
+		}
+	}
+	var increment *int
+	if flags&(1<<4) != 0 {
+		increment, err = decode.DecodeInt(buf)
+		if err != nil {
+			return err
+		}
+	}
+	var isCycle *bool
+	if flags&(1<<5) != 0 {
+		isCycle, err = decode.DecodeBool(buf)
+		if err != nil {
+			return err
+		}
+	}
+	var lastValue *int
+	if flags&(1<<6) != 0 {
+		lastValue, err = decode.DecodeInt(buf)
+		if err != nil {
+			return err
+		}
+	}
+	var isCalled *bool
+	if flags&(1<<7) != 0 {
+		isCalled, err = decode.DecodeBool(buf)
+		if err != nil {
+			return err
+		}
+	}
+
+	diff.PrevRef = *prevRef
+	diff.Type = typeData
+	diff.Start = start
+	diff.Min = min
+	diff.Max = max
+	diff.Increment = increment
+	diff.IsCycle = isCycle
+	diff.LastValue = lastValue
+	diff.IsCalled = isCalled
+	return nil
 }
 
 func (diff *PSQLSequenceDiff) encodeData() []byte {

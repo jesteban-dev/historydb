@@ -3,6 +3,7 @@ package encode
 import (
 	"bytes"
 	"encoding/binary"
+	"time"
 )
 
 func EncodeString(buf *bytes.Buffer, s *string) {
@@ -21,9 +22,16 @@ func EncodeInt(buf *bytes.Buffer, i *int) {
 func EncodeBool(buf *bytes.Buffer, b *bool) {
 	if b != nil {
 		if *b {
-			buf.WriteByte('1')
+			buf.WriteByte(1)
 		} else {
-			buf.WriteByte('0')
+			buf.WriteByte(0)
 		}
+	}
+}
+
+func EncodeTime(buf *bytes.Buffer, t *time.Time) {
+	if t != nil {
+		timeString := t.Format(time.RFC3339)
+		EncodeString(buf, &timeString)
 	}
 }

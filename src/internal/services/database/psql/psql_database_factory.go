@@ -2,7 +2,7 @@ package psql
 
 import (
 	"database/sql"
-	services "historydb/src/internal/services/database"
+	database_services "historydb/src/internal/services/database"
 )
 
 type PSQLDatabaseFactory struct {
@@ -13,11 +13,11 @@ func NewPSQLDatabaseFactory(db *sql.DB) *PSQLDatabaseFactory {
 	return &PSQLDatabaseFactory{db}
 }
 
-func (factory *PSQLDatabaseFactory) CreateReader() services.DatabaseReader {
+func (factory *PSQLDatabaseFactory) CreateReader() database_services.DatabaseReader {
 	return NewPSQLDatabaseReader(factory.db)
 }
 
-func (factory *PSQLDatabaseFactory) CreateWriter() services.DatabaseWriter {
+func (factory *PSQLDatabaseFactory) CreateWriter() database_services.DatabaseWriter {
 	return NewPSQLDatabaseWriter(factory.db)
 }
 

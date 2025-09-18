@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"historydb/src/internal/entities"
+	"historydb/src/internal/services"
 	"historydb/src/internal/services/entities/psql"
 	"strings"
 )
@@ -25,14 +26,14 @@ func (writer *PSQLDatabaseWriter) BeginTransaction() error {
 
 func (writer *PSQLDatabaseWriter) CommitTransaction() error {
 	if writer.tx == nil {
-		return fmt.Errorf("no db transaction in progress")
+		return services.ErrDatabaseTransactionNotFound
 	}
 	return writer.tx.Commit()
 }
 
 func (writer *PSQLDatabaseWriter) RollbackTransaction() error {
 	if writer.tx == nil {
-		return fmt.Errorf("no db transaction in progress")
+		return services.ErrDatabaseTransactionNotFound
 	}
 	return writer.tx.Rollback()
 }
@@ -51,8 +52,8 @@ func (writer *PSQLDatabaseWriter) SaveSchemaDependency(dependency entities.Schem
 		INCREMENT %d
 		MINVALUE %d
 		MAXVALUE %d
-	`, sequenceSchema, sequenceName, *sequence.Type, *sequence.Start, *sequence.Increment, *sequence.Min, *sequence.Max)
-	if *sequence.IsCycle {
+	`, sequenceSchema, sequenceName, sequence.Type, sequence.Start, sequence.Increment, sequence.Min, sequence.Max)
+	if sequence.IsCycle {
 		query += " CYCLE"
 	} else {
 		query += " NO CYCLE"
@@ -63,10 +64,10 @@ func (writer *PSQLDatabaseWriter) SaveSchemaDependency(dependency entities.Schem
 	}
 
 	updateQuery := fmt.Sprintf("ALTER SEQUENCE %s.%s", sequenceSchema, sequenceName)
-	if *sequence.IsCalled {
-		updateQuery += fmt.Sprintf(" RESTART WITH %d", *sequence.LastValue+*sequence.Increment)
+	if sequence.IsCalled {
+		updateQuery += fmt.Sprintf(" RESTART WITH %d", sequence.LastValue+sequence.Increment)
 	} else {
-		updateQuery += fmt.Sprintf(" RESTART WITH %d", *sequence.LastValue)
+		updateQuery += fmt.Sprintf(" RESTART WITH %d", sequence.LastValue)
 	}
 
 	_, err := writer.tx.Exec(updateQuery)

@@ -12,5 +12,6 @@ type DatabaseWriter interface {
 	BeginTransaction() error
 	CommitTransaction() error
 	RollbackTransaction() error
+
 	SaveSchemaDependency(dependency entities.SchemaDependency) error
 }
