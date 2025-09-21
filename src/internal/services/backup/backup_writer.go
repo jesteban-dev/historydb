@@ -21,4 +21,7 @@ type BackupWriter interface {
 
 	SaveSchemaDependency(dependency entities.SchemaDependency) error
 	SaveSchemaDependencyDiff(diff entities.SchemaDependencyDiff) error
+
+	SaveSchema(schema entities.Schema) error
+	SaveSchemaDiff(diff entities.SchemaDiff) error
 }

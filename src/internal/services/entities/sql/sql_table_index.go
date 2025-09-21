@@ -75,8 +75,11 @@ func (index *SQLTableIndex) DecodeFromBytes(data []byte) (*SQLTableIndex, error)
 
 func (index SQLTableIndex) getByteFlags() byte {
 	var flags byte
-	if index.Options != nil {
+	if len(index.Columns) > 0 {
 		flags |= 1 << 0
+	}
+	if index.Options != nil {
+		flags |= 1 << 1
 	}
 	return flags
 }

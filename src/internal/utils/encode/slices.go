@@ -10,13 +10,16 @@ func EncodePrimitiveSlice[T string | int | bool](buf *bytes.Buffer, s []T) {
 		var sliceBuf bytes.Buffer
 
 		for _, v := range s {
-			switch any(v).(type) {
+			switch val := any(v).(type) {
 			case string:
-				EncodeString(&sliceBuf, any(v).(*string))
+				vv := val
+				EncodeString(&sliceBuf, &vv)
 			case int:
-				EncodeInt(&sliceBuf, any(v).(*int))
+				vv := val
+				EncodeInt(&sliceBuf, &vv)
 			case bool:
-				EncodeBool(&sliceBuf, any(v).(*bool))
+				vv := val
+				EncodeBool(&sliceBuf, &vv)
 			}
 		}
 

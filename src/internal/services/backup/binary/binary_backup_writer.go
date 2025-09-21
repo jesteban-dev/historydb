@@ -101,3 +101,35 @@ func (writer *BinaryBackupWriter) SaveSchemaDependencyDiff(diff entities.SchemaD
 
 	return os.WriteFile(pathToFile, content, 0644)
 }
+
+func (writer *BinaryBackupWriter) SaveSchema(schema entities.Schema) error {
+	if writer.TxSnapshot == nil {
+		return services.ErrBackupTransactionNotFound
+	}
+
+	content := schema.EncodeToBytes()
+	hash := schema.Hash()
+
+	pathToFile := filepath.Join(writer.BackupPath, writer.TxSnapshot.SnapshotId, "schemas", fmt.Sprintf("%s.hdb", hash))
+	if err := os.MkdirAll(filepath.Dir(pathToFile), 0755); err != nil {
+		return err
+	}
+
+	return os.WriteFile(pathToFile, content, 0644)
+}
+
+func (writer *BinaryBackupWriter) SaveSchemaDiff(diff entities.SchemaDiff) error {
+	if writer.TxSnapshot == nil {
+		return services.ErrBackupTransactionNotFound
+	}
+
+	content := diff.EncodeToBytes()
+	hash := diff.Hash()
+
+	pathToFile := filepath.Join(writer.BackupPath, writer.TxSnapshot.SnapshotId, "schemas", "diffs", fmt.Sprintf("%s.hdb", hash))
+	if err := os.MkdirAll(filepath.Dir(pathToFile), 0755); err != nil {
+		return err
+	}
+
+	return os.WriteFile(pathToFile, content, 0644)
+}

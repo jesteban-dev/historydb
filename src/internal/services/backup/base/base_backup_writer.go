@@ -28,6 +28,9 @@ func (writer *BaseBackupWriter) CreateBackupStructure() error {
 	if err := os.Mkdir(filepath.Join(writer.BackupPath, "schemas"), 0755); err != nil {
 		return err
 	}
+	if err := os.Mkdir(filepath.Join(writer.BackupPath, "schemas", "diffs"), 0755); err != nil {
+		return err
+	}
 	if err := os.Mkdir(filepath.Join(writer.BackupPath, "schemas", "dependencies"), 0755); err != nil {
 		return err
 	}

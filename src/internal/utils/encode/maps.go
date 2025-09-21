@@ -27,6 +27,12 @@ func EncodeMap(buf *bytes.Buffer, m map[string]interface{}) {
 			case string:
 				mapBuf.WriteByte(0x01)
 				EncodeString(&mapBuf, &val)
+			case int:
+				mapBuf.WriteByte(0x02)
+				EncodeInt(&mapBuf, &val)
+			case bool:
+				mapBuf.WriteByte(0x03)
+				EncodeBool(&mapBuf, &val)
 			default:
 				panic(fmt.Sprintf("unsupported type: %T", val))
 			}
