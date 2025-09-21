@@ -5,6 +5,26 @@ import (
 	"encoding/binary"
 )
 
+func EncodePrimitiveSlice[T string | int | bool](buf *bytes.Buffer, s []T) {
+	if len(s) > 0 {
+		var sliceBuf bytes.Buffer
+
+		for _, v := range s {
+			switch any(v).(type) {
+			case string:
+				EncodeString(&sliceBuf, any(v).(*string))
+			case int:
+				EncodeInt(&sliceBuf, any(v).(*int))
+			case bool:
+				EncodeBool(&sliceBuf, any(v).(*bool))
+			}
+		}
+
+		binary.Write(buf, binary.LittleEndian, uint64(len(sliceBuf.Bytes())))
+		buf.Write(sliceBuf.Bytes())
+	}
+}
+
 func EncodeSlice[T Encodable](buf *bytes.Buffer, s []T) {
 	if len(s) > 0 {
 		var sliceBuf bytes.Buffer

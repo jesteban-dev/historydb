@@ -8,5 +8,8 @@ import "historydb/src/internal/entities"
 // ListSchemaDependencies() -> List the DB dependencies. (Sequences, etc...)
 type DatabaseReader interface {
 	CheckDBIsEmpty() (bool, error)
+
 	ListSchemaDependencies() ([]entities.SchemaDependency, error)
+	ListSchemaNames() ([]string, error)
+	GetSchemaDefinition(schemaName string) (entities.Schema, error)
 }
