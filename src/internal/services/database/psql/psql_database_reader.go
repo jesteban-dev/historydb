@@ -107,7 +107,7 @@ func (reader *PSQLDatabaseReader) ListSchemaNames() ([]string, error) {
 }
 
 func (reader *PSQLDatabaseReader) GetSchemaDefinition(schemaName string) (entities.Schema, error) {
-	tableSchema, tableName := reader.parseTableName(schemaName)
+	tableSchema, tableName := reader.parseDBObjectName(schemaName)
 
 	columns, err := reader.extractColumnsFromTable(tableSchema, tableName)
 	if err != nil {
@@ -138,7 +138,7 @@ func (reader *PSQLDatabaseReader) GetSchemaDefinition(schemaName string) (entiti
 
 func (reader *PSQLDatabaseReader) GetSchemaRecordMetadata(schemaName string) (entities.SchemaRecordMetadata, error) {
 	metadata := entities.SchemaRecordMetadata{}
-	tableSchema, tableName := reader.parseTableName(schemaName)
+	tableSchema, tableName := reader.parseDBObjectName(schemaName)
 
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM %s.%s", pq.QuoteIdentifier(tableSchema), pq.QuoteIdentifier(tableName))
 	if err := reader.db.QueryRow(countQuery).Scan(&metadata.Count); err != nil {
@@ -155,7 +155,7 @@ func (reader *PSQLDatabaseReader) GetSchemaRecordMetadata(schemaName string) (en
 
 func (reader *PSQLDatabaseReader) GetSchemaRecordChunk(schema entities.Schema, chunkSize int, chunkCursor interface{}) (entities.SchemaRecordChunk, interface{}, error) {
 	table := schema.(*sql_entities.SQLTable)
-	tableSchema, tableName := reader.parseTableName(table.Name)
+	tableSchema, tableName := reader.parseDBObjectName(table.Name)
 
 	cursor, ok := chunkCursor.(*sql_entities.SQLChunkCursor)
 	if !ok || cursor == nil {
@@ -250,8 +250,8 @@ func (reader *PSQLDatabaseReader) GetSchemaRecordChunk(schema entities.Schema, c
 
 // As PSQL has schemes and our Schema names for this language is composed as <scheme-name>.<table-name>,
 // we need this function to obtain the name separately.
-func (dbReader *PSQLDatabaseReader) parseTableName(tableName string) (schema, table string) {
-	parts := strings.Split(tableName, ".")
+func (dbReader *PSQLDatabaseReader) parseDBObjectName(objectName string) (string, string) {
+	parts := strings.Split(objectName, ".")
 	if len(parts) == 2 {
 		return parts[0], parts[1]
 	}
