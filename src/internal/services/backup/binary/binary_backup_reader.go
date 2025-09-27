@@ -27,7 +27,7 @@ func (reader *BinaryBackupReader) GetBackupMetadata() (entities.BackupMetadata, 
 	pathToFile := filepath.Join(reader.backupPath, "metadata.hdb")
 	data, err := os.ReadFile(pathToFile)
 	if err != nil {
-		return entities.BackupMetadata{}, err
+		return entities.BackupMetadata{}, fmt.Errorf("%w: %s", services.ErrBackupDirNotExists, err.Error())
 	}
 
 	if len(data) < sha256.Size {

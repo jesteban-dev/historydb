@@ -3,9 +3,10 @@ package app
 import (
 	"database/sql"
 	"fmt"
-	"historydb/src/internal/services"
-	"historydb/src/internal/services/backup_impl"
-	"historydb/src/internal/services/database_impl"
+	backup_services "historydb/src/internal/services/backup"
+	"historydb/src/internal/services/backup/binary"
+	database_services "historydb/src/internal/services/database"
+	"historydb/src/internal/services/database/psql"
 
 	_ "github.com/lib/pq"
 )
@@ -29,16 +30,16 @@ func openDBConnection(engine string, dsn string) (*sql.DB, error) {
 }
 
 // createDatabaseFactory creates the implementation of the DatabaseFactory needed for the engine provided by the user
-func createDatabaseFactory(engine string, db *sql.DB) services.DatabaseFactory {
+func createDatabaseFactory(engine string, db *sql.DB) database_services.DatabaseFactory {
 	switch engine {
 	case "postgres":
-		return database_impl.NewPSQLDatabaseFactory(db)
+		return psql.NewPSQLDatabaseFactory(db)
 	default:
 		return nil
 	}
 }
 
 // createBackupFactory creates the implementation of the BackupFactory needed
-func createBackupFactory(basePath string) services.BackupFactory {
-	return backup_impl.NewJSONBackupFactory(basePath)
+func createBackupFactory(basePath string) backup_services.BackupFactory {
+	return binary.NewBinaryBackupFactory(basePath)
 }

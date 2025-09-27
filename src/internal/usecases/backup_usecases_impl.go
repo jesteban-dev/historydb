@@ -1,17 +1,14 @@
 package usecases
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"historydb/src/internal/entities"
-	"historydb/src/internal/helpers"
 	"historydb/src/internal/services"
-	"historydb/src/internal/usecases/dtos"
-	"math"
+	backup_services "historydb/src/internal/services/backup"
+	database_services "historydb/src/internal/services/database"
+	"historydb/src/internal/utils/crypto"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,57 +17,118 @@ import (
 )
 
 type BackupUsecasesImpl struct {
-	dbFactory     services.DatabaseFactory
-	backupFactory services.BackupFactory
+	dbFactory     database_services.DatabaseFactory
+	backupFactory backup_services.BackupFactory
 	logger        *logrus.Logger
 }
 
-func NewBackupUsecasesImpl(dbFactory services.DatabaseFactory, backupFactory services.BackupFactory, logger *logrus.Logger) *BackupUsecasesImpl {
+func NewBackupUsecasesImpl(dbFactory database_services.DatabaseFactory, backupFactory backup_services.BackupFactory, logger *logrus.Logger) *BackupUsecasesImpl {
 	return &BackupUsecasesImpl{dbFactory, backupFactory, logger}
 }
 
-// Creates a new snapshot for the backup
-// - If the backup does not exist it initializes the backup structure
-func (uc *BackupUsecasesImpl) CreateSnapshot(newBackup bool) *entities.BackupSnapshot {
-	backupWriter := uc.backupFactory.CreateWriter()
-
-	snapshot := entities.BackupSnapshot{Id: uuid.NewString(), Timestamp: time.Now(), SchemaDependencies: make(map[string]string), Schemas: make(map[string]string), Data: make(map[string]entities.BackupSnapshotData)}
-	if newBackup {
-		if err := backupWriter.CreateBackupStructure(); err != nil {
-			if errors.Is(err, services.ErrBackupDirExists) {
-				fmt.Println("The specified path already exists.")
-				fmt.Println("To create a new backup you need to provided a non existing path, that will be created.")
-				return nil
-			}
-
-			uc.logger.Errorf("could not create backup directory: %v\n", err)
-			return nil
-		}
-		fmt.Println("Created backup directory")
-	}
-
-	return &snapshot
-}
-
-// Returns the existent backup metadata and checks if the backup DB engine matches with the provided DB
 func (uc *BackupUsecasesImpl) GetBackupMetadata() *entities.BackupMetadata {
 	backupReader := uc.backupFactory.CreateReader()
 
-	backupMetadata, err := backupReader.ReadBackupMetadata()
+	backupMetadata, err := backupReader.GetBackupMetadata()
 	if err != nil {
-		fmt.Println("The specified path does not contain a backup")
-		return nil
-	}
-	if !uc.dbFactory.CheckBackupDB(backupMetadata.Database) {
-		fmt.Println("The database and backup engines does not match")
+		if errors.Is(err, services.ErrBackupDirNotExists) {
+			fmt.Println("The specified backup path does not contain any backup.")
+		} else if errors.Is(err, services.ErrBackupCorruptedFile) {
+			fmt.Println("The specified backup is corrupted.")
+		}
+
+		uc.logger.Errorf("could not retrieve backup metadata: %v\n", err)
 		return nil
 	}
 
 	return &backupMetadata
 }
 
-// Makes the first backup for all the schema dependencies
-func (uc *BackupUsecasesImpl) BackupSchemaDependencies(snapshot *entities.BackupSnapshot) bool {
+func (uc *BackupUsecasesImpl) GetSnapshot(snapshotId string) *entities.BackupSnapshot {
+	backupReader := uc.backupFactory.CreateReader()
+
+	snapshot, err := backupReader.GetBackupSnapshot(snapshotId)
+	if err != nil {
+		if errors.Is(err, services.ErrBackupCorruptedFile) {
+			fmt.Println("The specified snapshot is corrupted.")
+		}
+
+		uc.logger.Errorf("could not retrieve bacup snapshot: %v\n", err)
+		return nil
+	}
+
+	return &snapshot
+}
+
+func (uc *BackupUsecasesImpl) CreateSnapshot(first bool) *entities.BackupSnapshot {
+	backupWriter := uc.backupFactory.CreateWriter()
+
+	snapshot := entities.BackupSnapshot{
+		SnapshotId:         uuid.NewString(),
+		Timestamp:          time.Now(),
+		SchemaDependencies: make(map[string]string),
+		Schemas:            make(map[string]string),
+	}
+	if first {
+		if err := backupWriter.CreateBackupStructure(); err != nil {
+			if errors.Is(err, services.ErrBackupDirExists) {
+				fmt.Println("The specified backup path already exists.\nTo create a new backup you need to provide a non-existing path, that will be created in the process.")
+			}
+
+			uc.logger.Errorf("could not create backup directory: %v\n", err)
+			return nil
+		}
+	}
+
+	if err := backupWriter.BeginSnapshot(&snapshot); err != nil {
+		uc.logger.Errorf("could not begin snapshot: %v\n", err)
+		return nil
+	}
+
+	return &snapshot
+}
+
+func (uc *BackupUsecasesImpl) CommitSnapshot(metadata *entities.BackupMetadata, snapshot *entities.BackupSnapshot) bool {
+	backupWriter := uc.backupFactory.CreateWriter()
+
+	if metadata == nil {
+		metadata = &entities.BackupMetadata{DatabaseEngine: uc.dbFactory.GetDBEngine(), Snapshots: []entities.BackupMetadataSnapshot{{Timestamp: snapshot.Timestamp, SnapshotId: snapshot.SnapshotId}}}
+	} else {
+		metadata.Snapshots = append(metadata.Snapshots, entities.BackupMetadataSnapshot{Timestamp: snapshot.Timestamp, SnapshotId: snapshot.SnapshotId})
+	}
+
+	if err := backupWriter.CommitSnapshot(metadata); err != nil {
+		uc.logger.Errorf("could not save snapshot: %v\n", err)
+		return false
+	}
+
+	fmt.Println("Backup saved successfully!")
+	return true
+}
+
+func (uc *BackupUsecasesImpl) RollbackSnapshot(first bool) {
+	backupWriter := uc.backupFactory.CreateWriter()
+	fmt.Println("Process failed. Aborting operation...")
+
+	if first {
+		fmt.Println("  - Cleaning backup directory...")
+		if err := backupWriter.DeleteBackupStructure(); err != nil {
+			uc.logger.Errorf("could not delete backup directory: %v\n", err)
+			return
+		}
+		fmt.Println("  + Clean completed!")
+	} else {
+		fmt.Println("  - Rollback to previous state...")
+		if err := backupWriter.RollbackSnapshot(); err != nil {
+			uc.logger.Errorf("could not rollback to previous state: %v\n", err)
+			return
+		}
+		fmt.Println("  + Rollback completed!")
+	}
+	fmt.Println("Closing app...")
+}
+
+func (uc *BackupUsecasesImpl) BackupSchemaDependencies(lastSnapshot, snapshot *entities.BackupSnapshot) bool {
 	dbReader := uc.dbFactory.CreateReader()
 	backupWriter := uc.backupFactory.CreateWriter()
 
@@ -78,92 +136,63 @@ func (uc *BackupUsecasesImpl) BackupSchemaDependencies(snapshot *entities.Backup
 	schemaDependencies, err := dbReader.ListSchemaDependencies()
 	if err != nil {
 		uc.logger.Errorf("could not list schema dependencies from DB: %v\n", err)
-		uc.cleanBackup(backupWriter)
 		return false
 	}
 
 	// Backups all schema dependencies
 	schemaDependenciesProgress := progressbar.NewOptions(len(schemaDependencies), progressbar.OptionSetDescription(fmt.Sprintf("  + Saving all %d schema dependencies...", len(schemaDependencies))), progressbar.OptionSetWidth(30), progressbar.OptionSetWriter(os.Stdout), progressbar.OptionSetRenderBlankState(true))
 	for _, dependency := range schemaDependencies {
-		// Saves dependency into backup
-		if err := backupWriter.WriteSchemaDependency(snapshot.Id, dependency); err != nil {
-			uc.logger.Errorf("could not save %s schema dependency into backup: %v\n", dependency.GetName(), err)
-			uc.cleanBackup(backupWriter)
-			return false
-		}
+		if lastSnapshot != nil {
+			backupReader := uc.backupFactory.CreateReader()
 
-		// Saves ref into snapshot
-		hash, err := dependency.Hash()
-		if err != nil {
-			uc.logger.Errorf("could not hash %s schema dependency: %v\n", dependency.GetName(), err)
-			uc.cleanBackup(backupWriter)
-			return false
-		}
-		snapshot.SchemaDependencies[dependency.GetName()] = hash
-		schemaDependenciesProgress.Add(1)
-	}
-	fmt.Println("  - All schema dependencies saved successfully")
-	return true
-}
+			// If no condition it stays unmodified
+			hash := dependency.Hash()
+			prevHash, ok := lastSnapshot.SchemaDependencies[dependency.GetName()]
+			if !ok {
+				// New dependency to write into backup
+				if err := backupWriter.SaveSchemaDependency(dependency); err != nil {
+					uc.logger.Errorf("could not save %s schema dependency into backup: %v\n", dependency.GetName(), err)
+					return false
+				}
 
-// Snapshot the schema dependencies changes into the backup
-func (uc *BackupUsecasesImpl) SnapshotSchemaDependencies(lastSnapshot, snapshot *entities.BackupSnapshot) bool {
-	dbReader := uc.dbFactory.CreateReader()
-	backupReader := uc.backupFactory.CreateReader()
-	backupWriter := uc.backupFactory.CreateWriter()
+				snapshot.SchemaDependencies[dependency.GetName()] = hash
+			} else if !crypto.CompareHashes(prevHash, hash) {
+				// Updates dependency into backup
+				prevDependency, err := backupReader.GetSchemaDependency(prevHash)
+				if err != nil {
+					if errors.Is(err, services.ErrBackupCorruptedFile) {
+						fmt.Printf("The %s schema dependency in backup is corrupted\n", dependency.GetName())
+					}
+					uc.logger.Errorf("could not read %s schema dependency from backup: %v\n", dependency.GetName(), err)
+					return false
+				}
 
-	// List schema dependencies from database
-	schemaDependencies, err := dbReader.ListSchemaDependencies()
-	if err != nil {
-		uc.logger.Errorf("could not list schema dependencies from DB: %v\n", err)
-		return false
-	}
+				dependencyDiff := dependency.Diff(prevDependency)
+				if err := backupWriter.SaveSchemaDependencyDiff(dependencyDiff); err != nil {
+					uc.logger.Errorf("could not update %s schema dependency into backup: %v\n", dependency.GetName(), err)
+					return false
+				}
 
-	// Updates all schema dependencies
-	schemaDependenciesProgress := progressbar.NewOptions(len(schemaDependencies), progressbar.OptionSetDescription(fmt.Sprintf("  + Saving all %d schema dependencies...", len(schemaDependencies))), progressbar.OptionSetWidth(30), progressbar.OptionSetWriter(os.Stdout), progressbar.OptionSetRenderBlankState(true))
-	for _, dependency := range schemaDependencies {
-		hash, err := dependency.Hash()
-		if err != nil {
-			uc.logger.Errorf("could not hash %s schema dependency: %v\n", dependency.GetName(), err)
-			uc.rollbackBackup(snapshot.Id, backupWriter)
-			return false
-		}
-
-		// If no condition it stays unmodified
-		prevHash, ok := lastSnapshot.SchemaDependencies[dependency.GetName()]
-		if !ok {
-			// New dependency to write into backup
-			if err := backupWriter.WriteSchemaDependency(snapshot.Id, dependency); err != nil {
+				snapshot.SchemaDependencies[dependency.GetName()] = fmt.Sprintf("diffs/%s", hash)
+			}
+		} else {
+			// Saves dependency into backup
+			if err := backupWriter.SaveSchemaDependency(dependency); err != nil {
 				uc.logger.Errorf("could not save %s schema dependency into backup: %v\n", dependency.GetName(), err)
-				uc.rollbackBackup(snapshot.Id, backupWriter)
-				return false
-			}
-		} else if !helpers.CompareHashes(prevHash, hash) {
-			// Updates dependency into backup
-			prevDependency, err := backupReader.ReadSchemaDependency(prevHash)
-			if err != nil {
-				uc.logger.Errorf("could not read %s schema dependency from backup: %v\n", dependency.GetName(), err)
-				uc.rollbackBackup(snapshot.Id, backupWriter)
 				return false
 			}
 
-			dependencyDiff := dependency.Diff(prevDependency)
-			if err := backupWriter.WriteSchemaDependencyDiff(snapshot.Id, dependencyDiff); err != nil {
-				uc.logger.Errorf("could not update %s schema dependency into backup: %v\n", dependency.GetName(), err)
-				uc.rollbackBackup(snapshot.Id, backupWriter)
-				return false
-			}
+			// Saves ref into snapshot
+			snapshot.SchemaDependencies[dependency.GetName()] = dependency.Hash()
 		}
-
-		snapshot.SchemaDependencies[dependency.GetName()] = hash
 		schemaDependenciesProgress.Add(1)
 	}
-	fmt.Println("  - All schema dependencies updated successfully")
+
+	fmt.Println("  - All schema dependencies saved successfully!")
 	return true
 }
 
-// Makes the first backup for all the schemas
-func (uc *BackupUsecasesImpl) BackupSchemas(snapshot *entities.BackupSnapshot) ([]entities.Schema, bool) {
+func (uc *BackupUsecasesImpl) BackupSchemas(lastSnapshot, snapshot *entities.BackupSnapshot) []entities.Schema {
 	dbReader := uc.dbFactory.CreateReader()
 	backupWriter := uc.backupFactory.CreateWriter()
 
@@ -171,10 +200,8 @@ func (uc *BackupUsecasesImpl) BackupSchemas(snapshot *entities.BackupSnapshot) (
 	schemaNames, err := dbReader.ListSchemaNames()
 	if err != nil {
 		uc.logger.Errorf("could not list schemas from DB: %v\n", err)
-		uc.cleanBackup(backupWriter)
-		return nil, false
+		return nil
 	}
-	fmt.Printf("Read %d schemas from DB: %s\n", len(schemaNames), strings.Join(schemaNames, ", "))
 
 	// Backups all schema definitions
 	schemas := make([]entities.Schema, 0, len(schemaNames))
@@ -182,342 +209,59 @@ func (uc *BackupUsecasesImpl) BackupSchemas(snapshot *entities.BackupSnapshot) (
 	for _, schemaName := range schemaNames {
 		// Reads schema definition
 		schema, err := dbReader.GetSchemaDefinition(schemaName)
-		schemas = append(schemas, schema)
 		if err != nil {
-			uc.logger.Errorf("could not get %s schema definition from DB: %v\n", schemaName, err)
-			uc.cleanBackup(backupWriter)
-			return nil, false
+			uc.logger.Errorf("could not retrieve %s schema definition from DB: %v\n", schemaName, err)
+			return nil
 		}
+		hash := schema.Hash()
 
-		// Saves schema into the backup
-		if err := backupWriter.WriteSchema(snapshot.Id, schema); err != nil {
-			uc.logger.Errorf("could not save %s schema definition into backup: %v\n", schemaName, err)
-			uc.cleanBackup(backupWriter)
-			return nil, false
-		}
+		if lastSnapshot != nil {
+			backupReader := uc.backupFactory.CreateReader()
 
-		// Saves the schema ref into the snapshot
-		hash, err := schema.Hash()
-		if err != nil {
-			uc.logger.Errorf("could not hash %s schema definition: %v\n", schemaName, err)
-			uc.cleanBackup(backupWriter)
-			return nil, false
-		}
-		snapshot.Schemas[schemaName] = hash
-		schemaProgress.Add(1)
-	}
-	fmt.Println("  - All schema definitios saved successfully")
-	return schemas, true
-}
+			// If no condition it stays unmodified
+			prevHash, ok := lastSnapshot.Schemas[schemaName]
+			if !ok {
+				// New schema to write into backup
+				if err := backupWriter.SaveSchema(schema); err != nil {
+					uc.logger.Errorf("could not save %s schema definition into backup: %v\n", schemaName, err)
+					return nil
+				}
 
-// Snapshot the schema changes into the backup
-func (uc *BackupUsecasesImpl) SnapshotSchemas(lastSnapshot, snapshot *entities.BackupSnapshot) bool {
-	dbReader := uc.dbFactory.CreateReader()
-	backupReader := uc.backupFactory.CreateReader()
-	backupWriter := uc.backupFactory.CreateWriter()
-
-	// List schemas from database
-	schemaNames, err := dbReader.ListSchemaNames()
-	if err != nil {
-		uc.logger.Errorf("could not list schemas from DB: %v\n", err)
-		uc.rollbackBackup(snapshot.Id, backupWriter)
-		return false
-	}
-
-	// Updates all schema definitions
-	schemaProgress := progressbar.NewOptions(len(schemaNames), progressbar.OptionSetDescription(fmt.Sprintf("  + Saving all %d schema definitions...", len(schemaNames))), progressbar.OptionSetWidth(30), progressbar.OptionSetWriter(os.Stdout), progressbar.OptionSetRenderBlankState(true))
-	for _, schemaName := range schemaNames {
-		// Read schema definition
-		schema, err := dbReader.GetSchemaDefinition(schemaName)
-		if err != nil {
-			uc.logger.Errorf("could not get %s schema definition from DB: %v\n", schemaName, err)
-			uc.rollbackBackup(snapshot.Id, backupWriter)
-			return false
-		}
-
-		hash, err := schema.Hash()
-		if err != nil {
-			uc.logger.Errorf("could not hash %s schema definition: %v\n", schemaName, err)
-			uc.rollbackBackup(snapshot.Id, backupWriter)
-			return false
-		}
-
-		// If no condition it stays unmodified
-		prevHash, ok := lastSnapshot.Schemas[schemaName]
-		if !ok {
-			// New schema to write into backup
-			if err := backupWriter.WriteSchema(snapshot.Id, schema); err != nil {
-				uc.logger.Errorf("could not save %s schema definition into backup: %v\n", schemaName, err)
-				uc.rollbackBackup(snapshot.Id, backupWriter)
-				return false
-			}
-		} else if !helpers.CompareHashes(prevHash, hash) {
-			// Updates schema into backup
-			prevSchema, err := backupReader.ReadSchema(prevHash)
-			if err != nil {
-				uc.logger.Errorf("could not read %s schema definition from backup: %v\n", schemaName, err)
-				uc.rollbackBackup(snapshot.Id, backupWriter)
-				return false
-			}
-
-			schemaDiff := schema.Diff(prevSchema)
-			if err := backupWriter.WriteSchemaDiff(snapshot.Id, schemaDiff); err != nil {
-				uc.logger.Errorf("could not update %s schema dependency into backup: %v\n", schemaName, err)
-				uc.rollbackBackup(snapshot.Id, backupWriter)
-				return false
-			}
-		}
-
-		snapshot.Schemas[schemaName] = hash
-		schemaProgress.Add(1)
-	}
-	fmt.Println("  - All schema definitios updated successfully")
-	return true
-}
-
-func (uc *BackupUsecasesImpl) BackupSchemaData(snapshot *entities.BackupSnapshot, schema entities.Schema) bool {
-	dbReader := uc.dbFactory.CreateReader()
-	backupWriter := uc.backupFactory.CreateWriter()
-
-	dataLength, err := dbReader.GetSchemaDataLength(schema.GetName())
-	if err != nil {
-		uc.logger.Errorf("could not get total schema data length: %v\n", err)
-		uc.cleanBackup(backupWriter)
-		return false
-	}
-
-	batchSize, chunkSize, err := dbReader.GetSchemaDataBatchAndChunkSize(schema.GetName())
-	if err != nil {
-		uc.logger.Errorf("could not get batch size for %s schema: %v\n", schema.GetName(), err)
-		uc.cleanBackup(backupWriter)
-		return false
-	}
-
-	dataSaved := 0
-	batchHashes := []string{}
-	dataProgress := progressbar.NewOptions(int(math.Ceil(float64(dataLength)/float64(chunkSize))), progressbar.OptionSetDescription(fmt.Sprintf("  + Saving %s schema data...", schema.GetName())), progressbar.OptionSetWidth(30), progressbar.OptionSetWriter(os.Stdout), progressbar.OptionSetRenderBlankState(true))
-	for dataSaved < dataLength {
-		tempBatchName := uuid.NewString()
-		batchHash := sha256.New()
-		currentBatchSize := 0
-
-		var cursor entities.ChunkCursor = nil
-		for currentBatchSize < batchSize {
-			data, nextCursor, err := dbReader.GetSchemaDataChunk(schema, chunkSize, cursor)
-			if err != nil {
-				uc.logger.Errorf("could not retrieve data chunk from %s schema: %v\n", schema.GetName(), err)
-				uc.cleanBackup(backupWriter)
-				return false
-			}
-
-			if data.Length() == 0 {
-				break
-			} else {
-				currentBatchSize += data.Length()
-			}
-
-			if err := data.HashContent(); err != nil {
-				uc.logger.Errorf("could not hash chunk content: %v\n", err)
-				uc.cleanBackup(backupWriter)
-				return false
-			}
-			chunkHash, err := data.Hash()
-			if err != nil {
-				uc.logger.Errorf("could not hash chunk: %v\n", err)
-				uc.cleanBackup(backupWriter)
-				return false
-			}
-
-			if err := backupWriter.WriteSchemaDataChunk(snapshot.Id, tempBatchName, data); err != nil {
-				uc.logger.Errorf("could not save data chunk in backup: %v\n", err)
-				uc.cleanBackup(backupWriter)
-				return false
-			}
-
-			cursor = nextCursor
-			batchHash.Write([]byte(chunkHash))
-			batchHash.Write([]byte("|"))
-			dataProgress.Add(1)
-		}
-
-		batchHashString := hex.EncodeToString(batchHash.Sum(nil))
-		if err := backupWriter.WriteSchemaDataBatch(snapshot.Id, tempBatchName, batchHashString); err != nil {
-			uc.logger.Errorf("could not save data batch in backup: %v\n", err)
-			uc.cleanBackup(backupWriter)
-			return false
-		}
-		batchHashes = append(batchHashes, batchHashString)
-		dataSaved += currentBatchSize
-	}
-	fmt.Println("  - All schema data saved successfully")
-
-	snapshot.Data[schema.GetName()] = entities.BackupSnapshotData{
-		BatchSize: batchSize,
-		ChunkSize: chunkSize,
-		Data:      batchHashes,
-	}
-	return true
-}
-
-func (uc *BackupUsecasesImpl) SnapshotSchemaData(lastSnapshot, snapshot *entities.BackupSnapshot, schema entities.Schema) bool {
-	dbReader := uc.dbFactory.CreateReader()
-	backupReader := uc.backupFactory.CreateReader()
-	backupWriter := uc.backupFactory.CreateWriter()
-
-	schemaMetadata := lastSnapshot.Data[schema.GetName()]
-
-	dataLength, err := dbReader.GetSchemaDataLength(schema.GetName())
-	if err != nil {
-		uc.logger.Errorf("could not get total schema data length: %v\n", err)
-		uc.rollbackBackup(snapshot.Id, backupWriter)
-		return false
-	}
-
-	dataSaved := 0
-	batchIndex := 0
-	for dataSaved < dataLength {
-		currentBatchSize := 0
-		batchHash := sha256.New()
-		batchChunks := []dtos.BatchChunkInfo{}
-
-		var cursor entities.ChunkCursor = nil
-		for currentBatchSize < schemaMetadata.BatchSize {
-			data, nextCursor, err := dbReader.GetSchemaDataChunk(schema, schemaMetadata.ChunkSize, cursor)
-			if err != nil {
-				uc.logger.Errorf("could not retrieve data chunk from %s schema: %v\n", schema.GetName(), err)
-				uc.rollbackBackup(snapshot.Id, backupWriter)
-				return false
-			}
-
-			if data.Length() == 0 {
-				break
-			} else {
-				currentBatchSize += data.Length()
-			}
-
-			chunkHash, err := data.Hash()
-			if err != nil {
-				uc.logger.Errorf("could not hash chunk: %v\n", err)
-				uc.rollbackBackup(snapshot.Id, backupWriter)
-				return false
-			}
-
-			batchChunks = append(batchChunks, dtos.BatchChunkInfo{
-				Hash:   chunkHash,
-				Cursor: cursor,
-			})
-			cursor = nextCursor
-			batchHash.Write([]byte(chunkHash))
-			batchHash.Write([]byte("|"))
-		}
-
-		batchHashString := hex.EncodeToString(batchHash.Sum(nil))
-		if len(schemaMetadata.Data) > batchIndex {
-			// Compare Batch hashes, if it is equal we continue to the next batch
-			if !helpers.CompareHashes(schemaMetadata.Data[batchIndex], batchHashString) {
-				// Compare each chunk hash
-				// What if DB Chunks > Backup Chunks
-				// What if DB Chunks < Backup Chunks
-				backupChunks, err := backupReader.ReadSchemaDataBatchChunks(schemaMetadata.Data[batchIndex])
+				snapshot.Schemas[schemaName] = hash
+			} else if !crypto.CompareHashes(prevHash, hash) {
+				// Updates schema into backup
+				prevSchema, err := backupReader.GetSchema(prevHash)
 				if err != nil {
-					uc.logger.Errorf("could not retrieve chunks from backup batch in %s schema: %v\n", schema.GetName(), err)
-					uc.rollbackBackup(snapshot.Id, backupWriter)
-					return false
-				}
-
-				for i := 0; i < int(math.Max(float64(len(backupChunks)), float64(len(batchChunks)))); i++ {
-					if len(backupChunks) <= i {
-						// Chunk does not exist in backupChunks -> New chunk to add
-						_, _, err := dbReader.GetSchemaDataChunk(schema, schemaMetadata.ChunkSize, batchChunks[i].Cursor)
-						if err != nil {
-							uc.logger.Errorf("could not retrieve data chunk from %s schema: %v\n", schema.GetName(), err)
-							uc.rollbackBackup(snapshot.Id, backupWriter)
-							return false
-						}
-						// Write chunk in backup with new hash, no old hash?
-					} else if len(batchChunks) <= i {
-						// Chunk does not exist in batchChunks -> Old chunk to delete
-						_, err := backupReader.ReadSchemaDataChunk(schemaMetadata.Data[batchIndex], backupChunks[i])
-						if err != nil {
-							uc.logger.Errorf("coudl not retrieve data chunk from backup: %v\n", err)
-							uc.rollbackBackup(snapshot.Id, backupWriter)
-							return false
-						}
-						// Write chunk diff with no new hash to delete ?
-					} else if len(backupChunks) > i && len(batchChunks) > i && !helpers.CompareHashes(backupChunks[i], batchChunks[i].Hash) {
-						// Chunks does not match -> Replace chunk data
-						_, _, err := dbReader.GetSchemaDataChunk(schema, schemaMetadata.ChunkSize, batchChunks[i].Cursor)
-						if err != nil {
-							uc.logger.Errorf("could not retrieve data chunk from %s schema: %v\n", schema.GetName(), err)
-							uc.rollbackBackup(snapshot.Id, backupWriter)
-							return false
-						}
-
-						_, err = backupReader.ReadSchemaDataChunk(schemaMetadata.Data[batchIndex], backupChunks[i])
-						if err != nil {
-							uc.logger.Errorf("coudl not retrieve data chunk from backup: %v\n", err)
-							uc.rollbackBackup(snapshot.Id, backupWriter)
-							return false
-						}
-
-						// Write diff between batches
+					if errors.Is(err, services.ErrBackupCorruptedFile) {
+						fmt.Printf("The %s schema in backup is corrupted\n", schema.GetName())
 					}
+
+					uc.logger.Errorf("could not read %s schema definition from backup: %v\n", schemaName, err)
+					return nil
 				}
+
+				schemaDiff := schema.Diff(prevSchema)
+				if err := backupWriter.SaveSchemaDiff(schemaDiff); err != nil {
+					uc.logger.Errorf("could not update %s schema definition into backup: %v\n", schemaName, err)
+					return nil
+				}
+
+				snapshot.Schemas[schemaName] = fmt.Sprintf("diffs/%s", hash)
 			}
-			batchIndex++
-		}
-	}
-
-	return true
-}
-
-// Commits the snapshot into the backup metadata
-func (uc *BackupUsecasesImpl) CommitSnapshot(backupMetadata *entities.BackupMetadata, snapshot *entities.BackupSnapshot, isNewBackup bool) bool {
-	backupWriter := uc.backupFactory.CreateWriter()
-
-	if backupMetadata == nil {
-		backupMetadata = &entities.BackupMetadata{Database: uc.dbFactory.GetDBMetadata(), Snapshots: []entities.BackupSnapshot{*snapshot}}
-	} else {
-		backupMetadata.Snapshots = append(backupMetadata.Snapshots, *snapshot)
-	}
-
-	if err := backupWriter.CommitSnapshot(snapshot.Id, *backupMetadata); err != nil {
-		uc.logger.Errorf("could not save snapshot: %v\n", err)
-		if isNewBackup {
-			uc.cleanBackup(backupWriter)
 		} else {
-			uc.rollbackBackup(snapshot.Id, backupWriter)
+			schemas = append(schemas, schema)
+
+			// Saves schema into the backup
+			if err := backupWriter.SaveSchema(schema); err != nil {
+				uc.logger.Errorf("could not save %s schema definition into backup: %v\n", schemaName, err)
+				return nil
+			}
+
+			// Saves the schema ref into the snapshot
+			snapshot.Schemas[schemaName] = hash
 		}
-		return false
+		schemaProgress.Add(1)
 	}
-	fmt.Println("Backup saved successfully")
-	return true
-}
-
-// Cleans the backup structure when the first backup snapshot fails
-func (uc *BackupUsecasesImpl) cleanBackup(backupWriter services.BackupWriter) {
-	fmt.Println("Process failed. Aborting operation...")
-	fmt.Println("  - Cleaning backup directory...")
-
-	if err := backupWriter.DeleteBackupStructure(); err != nil {
-		uc.logger.Errorf("could not delete backup directory: %v\n", err)
-		return
-	}
-
-	fmt.Println("  + Clean successful")
-	fmt.Println("Closing app...")
-}
-
-// Rollbacks the backup to the previous stabel snapshot if the current snapshot fails
-func (uc *BackupUsecasesImpl) rollbackBackup(idSnapshot string, backupWriter services.BackupWriter) {
-	fmt.Println("Process failed. Aborting operation...")
-	fmt.Println("  - Rollback to previous state...")
-
-	if err := backupWriter.RollbackSnapshot(idSnapshot); err != nil {
-		uc.logger.Errorf("could not rollback to previous state: %v\n", err)
-		return
-	}
-
-	fmt.Println("  + Rollback completed")
-	fmt.Println("Closing app...")
+	fmt.Println("  - All schema definitions saved successfully")
+	return schemas
 }

@@ -4,8 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"historydb/src/internal/handlers"
-	"historydb/src/internal/helpers"
 	"historydb/src/internal/usecases"
+	"historydb/src/internal/utils/pointers"
 	"net/url"
 	"os"
 	"time"
@@ -68,7 +68,7 @@ func checkSnapshot(snapshot string) (*string, error) {
 		}
 	}
 
-	return helpers.Pointer(snapshot), nil
+	return pointers.Ptr(snapshot), nil
 }
 
 func checkRestoreArgsAndObtainEngine(connString, path string) (string, error) {

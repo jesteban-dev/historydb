@@ -13,42 +13,54 @@ func NewBackupHandler(backupUc usecases.BackupUsecases) *BackupHandler {
 func (handler *BackupHandler) CreateBackup() {
 	snapshot := handler.backupUc.CreateSnapshot(true)
 	if snapshot == nil {
+		handler.backupUc.RollbackSnapshot(true)
 		return
 	}
 
-	if ok := handler.backupUc.BackupSchemaDependencies(snapshot); !ok {
+	if ok := handler.backupUc.BackupSchemaDependencies(nil, snapshot); !ok {
+		handler.backupUc.RollbackSnapshot(true)
 		return
 	}
 
-	schemas, ok := handler.backupUc.BackupSchemas(snapshot)
-	if !ok {
+	schemas := handler.backupUc.BackupSchemas(nil, snapshot)
+	if schemas == nil {
+		handler.backupUc.RollbackSnapshot(true)
 		return
 	}
 
-	for _, schema := range schemas {
-		if ok := handler.backupUc.BackupSchemaData(snapshot, schema); !ok {
-			return
-		}
+	if ok := handler.backupUc.CommitSnapshot(nil, snapshot); !ok {
+		handler.backupUc.RollbackSnapshot(true)
 	}
-
-	handler.backupUc.CommitSnapshot(nil, snapshot, true)
 }
 
 func (handler *BackupHandler) SnapshotBackup() {
-	newSnapshot := handler.backupUc.CreateSnapshot(true)
 	backupMetadata := handler.backupUc.GetBackupMetadata()
 	if backupMetadata == nil {
 		return
 	}
-	lastSnapshot := &backupMetadata.Snapshots[len(backupMetadata.Snapshots)-1]
-
-	if ok := handler.backupUc.SnapshotSchemaDependencies(lastSnapshot, newSnapshot); !ok {
+	lastSnapshot := handler.backupUc.GetSnapshot(backupMetadata.Snapshots[len(backupMetadata.Snapshots)-1].SnapshotId)
+	if lastSnapshot == nil {
 		return
 	}
 
-	if ok := handler.backupUc.SnapshotSchemas(lastSnapshot, newSnapshot); !ok {
+	newSnapshot := handler.backupUc.CreateSnapshot(false)
+	if newSnapshot == nil {
+		handler.backupUc.RollbackSnapshot(false)
 		return
 	}
 
-	handler.backupUc.CommitSnapshot(backupMetadata, newSnapshot, false)
+	if ok := handler.backupUc.BackupSchemaDependencies(lastSnapshot, newSnapshot); !ok {
+		handler.backupUc.RollbackSnapshot(false)
+		return
+	}
+
+	schemas := handler.backupUc.BackupSchemas(lastSnapshot, newSnapshot)
+	if schemas == nil {
+		handler.backupUc.RollbackSnapshot(false)
+		return
+	}
+
+	if ok := handler.backupUc.CommitSnapshot(backupMetadata, newSnapshot); !ok {
+		handler.backupUc.RollbackSnapshot(false)
+	}
 }
