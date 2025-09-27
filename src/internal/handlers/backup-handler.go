@@ -17,12 +17,12 @@ func (handler *BackupHandler) CreateBackup() {
 		return
 	}
 
-	if ok := handler.backupUc.BackupSchemaDependencies(nil, snapshot); !ok {
+	if ok := handler.backupUc.BackupSchemaDependencies(snapshot); !ok {
 		handler.backupUc.RollbackSnapshot(true)
 		return
 	}
 
-	schemas := handler.backupUc.BackupSchemas(nil, snapshot)
+	schemas := handler.backupUc.BackupSchemas(snapshot)
 	if schemas == nil {
 		handler.backupUc.RollbackSnapshot(true)
 		return
@@ -49,12 +49,12 @@ func (handler *BackupHandler) SnapshotBackup() {
 		return
 	}
 
-	if ok := handler.backupUc.BackupSchemaDependencies(lastSnapshot, newSnapshot); !ok {
+	if ok := handler.backupUc.SnapshotSchemaDependencies(lastSnapshot, newSnapshot); !ok {
 		handler.backupUc.RollbackSnapshot(false)
 		return
 	}
 
-	schemas := handler.backupUc.BackupSchemas(lastSnapshot, newSnapshot)
+	schemas := handler.backupUc.SnapshotSchemas(lastSnapshot, newSnapshot)
 	if schemas == nil {
 		handler.backupUc.RollbackSnapshot(false)
 		return

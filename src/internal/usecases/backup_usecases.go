@@ -9,6 +9,9 @@ type BackupUsecases interface {
 	CommitSnapshot(metadata *entities.BackupMetadata, snapshot *entities.BackupSnapshot) bool
 	RollbackSnapshot(first bool)
 
-	BackupSchemaDependencies(lastSnapshot, snapshot *entities.BackupSnapshot) bool
-	BackupSchemas(lastSnapshot, snapshot *entities.BackupSnapshot) []entities.Schema
+	BackupSchemaDependencies(snapshot *entities.BackupSnapshot) bool
+	SnapshotSchemaDependencies(lastSnapshot, snapshot *entities.BackupSnapshot) bool
+
+	BackupSchemas(snapshot *entities.BackupSnapshot) []entities.Schema
+	SnapshotSchemas(lastSnapshot, snapshot *entities.BackupSnapshot) []entities.Schema
 }
