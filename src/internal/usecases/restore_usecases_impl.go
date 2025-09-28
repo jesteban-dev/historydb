@@ -128,7 +128,7 @@ func (uc *RestoreUsecasesImpl) RestoreSchemaDependencies(snapshot *entities.Back
 
 	schemaDependenciesProgress := progressbar.NewOptions(len(snapshot.SchemaDependencies), progressbar.OptionSetDescription(fmt.Sprintf("  + Restoring all %d schema dependencies...", len(snapshot.SchemaDependencies))), progressbar.OptionSetWidth(30), progressbar.OptionSetWriter(os.Stdout), progressbar.OptionSetRenderBlankState(true))
 	for dependencyName, snapshotDependency := range snapshot.SchemaDependencies {
-		dependency, err := backupReader.GetSchemaDependency(snapshotDependency)
+		dependency, _, err := backupReader.GetSchemaDependency(snapshotDependency)
 		if err != nil {
 			if errors.Is(err, services.ErrBackupCorruptedFile) {
 				fmt.Printf("The %s schema dependency in backup is corrupted\n", dependencyName)
@@ -157,7 +157,7 @@ func (uc *RestoreUsecasesImpl) RestoreSchemas(snapshot *entities.BackupSnapshot)
 	schemas := make([]entities.Schema, 0, len(snapshot.Schemas))
 	schemaProgress := progressbar.NewOptions(len(snapshot.Schemas), progressbar.OptionSetDescription(fmt.Sprintf("  + Restoring all %d schemas...", len(snapshot.Schemas))), progressbar.OptionSetWidth(30), progressbar.OptionSetWriter(os.Stdout), progressbar.OptionSetRenderBlankState(true))
 	for schemaName, snapshotSchema := range snapshot.Schemas {
-		schema, err := backupReader.GetSchema(snapshotSchema)
+		schema, _, err := backupReader.GetSchema(snapshotSchema)
 		if err != nil {
 			if errors.Is(err, services.ErrBackupCorruptedFile) {
 				fmt.Printf("The %s schema in backup is corrupted\n", schemaName)

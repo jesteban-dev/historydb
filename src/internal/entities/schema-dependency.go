@@ -20,7 +20,7 @@ type SchemaDependency interface {
 	GetDependencyType() DependencyType
 	GetName() string
 	Hash() string
-	Diff(dependency SchemaDependency) SchemaDependencyDiff
+	Diff(dependency SchemaDependency, isDiff bool) SchemaDependencyDiff
 	ApplyDiff(diff SchemaDependencyDiff) SchemaDependency
 	EncodeToBytes() []byte
 	DecodeFromBytes(data []byte) error

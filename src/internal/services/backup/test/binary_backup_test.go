@@ -15,19 +15,20 @@ import (
 
 type SchemaDependecyInfo struct {
 	dependency entities.SchemaDependency
-	toDiff     entities.SchemaDependency
+	toDiff     []entities.SchemaDependency
 }
 
 type SchemaInfo struct {
 	schema entities.Schema
-	toDiff entities.Schema
+	toDiff []entities.Schema
 }
 
 var expectedDependencies map[string]entities.SchemaDependency = map[string]entities.SchemaDependency{
 	"Sequence1": &psql.PSQLSequence{DependencyType: entities.PSQLSequence, Version: "1", Name: "Sequence1", Type: "integer", Start: 1, Min: 1, Max: 1000, Increment: 1, IsCycle: false, LastValue: 20, IsCalled: false},
-	"Sequence2": &psql.PSQLSequence{DependencyType: entities.PSQLSequence, Version: "1", Name: "Sequence2", Type: "integer", Start: 20, Min: 2, Max: 100, Increment: 2, IsCycle: false, LastValue: 30, IsCalled: true},
-	"Sequence3": &psql.PSQLSequence{DependencyType: entities.PSQLSequence, Version: "1", Name: "Sequence3", Type: "integer", Start: 1, Min: 2, Max: 10000, Increment: 3, IsCycle: false, LastValue: 10, IsCalled: true},
+	"Sequence2": &psql.PSQLSequence{DependencyType: entities.PSQLSequence, Version: "1", Name: "Sequence2", Type: "integer", Start: 20, Min: 2, Max: 100, Increment: 2, IsCycle: false, LastValue: 40, IsCalled: true},
+	"Sequence3": &psql.PSQLSequence{DependencyType: entities.PSQLSequence, Version: "1", Name: "Sequence3", Type: "integer", Start: 1, Min: 2, Max: 10000, Increment: 3, IsCycle: false, LastValue: 20, IsCalled: true},
 }
+
 var expectedSchemas map[string]entities.Schema = map[string]entities.Schema{
 	"Table1": &sql.SQLTable{
 		SchemaType: entities.SQLTable,
@@ -49,6 +50,26 @@ var expectedSchemas map[string]entities.Schema = map[string]entities.Schema{
 			{Name: "Column1", Type: "timestamptz", IsNullable: true, Position: 1},
 			{Name: "Column2", Type: "varying character(10)", IsNullable: true, Position: 2},
 			{Name: "Column3", Type: "bigint", IsNullable: true, Position: 3},
+		},
+		Constraints: []sql.SQLTableConstraint{
+			{Type: sql.PrimaryKey, Name: "Column1_pk", Columns: []string{"Column1"}},
+		},
+		ForeignKeys: []sql.SQLTableForeignKey{
+			{Name: "Table2_FK", Columns: []string{"Column3"}, ReferencedTable: "Table1", ReferencedColumns: []string{"Column1"}, UpdateAction: sql.NoAction, DeleteAction: sql.NoAction},
+		},
+		Indexes: []sql.SQLTableIndex{
+			{Name: "Table3_IDX", Type: "btree", Columns: []string{"Column1"}, Options: map[string]interface{}{"test1": 1}},
+		},
+	},
+	"Table3": &sql.SQLTable{
+		SchemaType: entities.SQLTable,
+		Version:    "1",
+		Name:       "Table2",
+		Columns: []sql.SQLTableColumn{
+			{Name: "Column1", Type: "timestamptz", IsNullable: true, Position: 1},
+			{Name: "Column2", Type: "varying character(10)", IsNullable: true, Position: 2},
+			{Name: "Column3", Type: "bigint", IsNullable: true, Position: 3},
+			{Name: "Column4", Type: "boolean", IsNullable: true, Position: 4},
 		},
 		Constraints: []sql.SQLTableConstraint{
 			{Type: sql.PrimaryKey, Name: "Column1_pk", Columns: []string{"Column1"}},
@@ -97,10 +118,16 @@ func TestBinaryBackup(t *testing.T) {
 		},
 		"Sequence2": {
 			dependency: &psql.PSQLSequence{DependencyType: entities.PSQLSequence, Version: "1", Name: "Sequence2", Type: "integer", Start: 20, Min: 2, Max: 100, Increment: 2, IsCycle: false, LastValue: 30, IsCalled: true},
+			toDiff: []entities.SchemaDependency{
+				&psql.PSQLSequence{DependencyType: entities.PSQLSequence, Version: "1", Name: "Sequence2", Type: "integer", Start: 20, Min: 2, Max: 100, Increment: 2, IsCycle: false, LastValue: 40, IsCalled: true},
+			},
 		},
 		"Sequence3": {
 			dependency: &psql.PSQLSequence{DependencyType: entities.PSQLSequence, Version: "1", Name: "Sequence3", Type: "integer", Start: 1, Min: 2, Max: 10000, Increment: 2, IsCycle: false, LastValue: 5, IsCalled: false},
-			toDiff:     &psql.PSQLSequence{DependencyType: entities.PSQLSequence, Version: "1", Name: "Sequence3", Type: "integer", Start: 1, Min: 2, Max: 10000, Increment: 3, IsCycle: false, LastValue: 10, IsCalled: true},
+			toDiff: []entities.SchemaDependency{
+				&psql.PSQLSequence{DependencyType: entities.PSQLSequence, Version: "1", Name: "Sequence3", Type: "integer", Start: 1, Min: 2, Max: 10000, Increment: 3, IsCycle: false, LastValue: 10, IsCalled: true},
+				&psql.PSQLSequence{DependencyType: entities.PSQLSequence, Version: "1", Name: "Sequence3", Type: "integer", Start: 1, Min: 2, Max: 10000, Increment: 3, IsCycle: false, LastValue: 20, IsCalled: true},
+			},
 		},
 	}
 	schemasMap := map[string]SchemaInfo{
@@ -131,23 +158,80 @@ func TestBinaryBackup(t *testing.T) {
 					{Name: "Table2_FK", Columns: []string{"Column3"}, ReferencedTable: "Table1", ReferencedColumns: []string{"Column1"}, UpdateAction: sql.NoAction, DeleteAction: sql.NoAction},
 				},
 			},
-			toDiff: &sql.SQLTable{
+			toDiff: []entities.Schema{
+				&sql.SQLTable{
+					SchemaType: entities.SQLTable,
+					Version:    "1",
+					Name:       "Table2",
+					Columns: []sql.SQLTableColumn{
+						{Name: "Column1", Type: "timestamptz", IsNullable: true, Position: 1},
+						{Name: "Column2", Type: "varying character(10)", IsNullable: true, Position: 2},
+						{Name: "Column3", Type: "bigint", IsNullable: true, Position: 3},
+					},
+					Constraints: []sql.SQLTableConstraint{
+						{Type: sql.PrimaryKey, Name: "Column1_pk", Columns: []string{"Column1"}},
+					},
+					ForeignKeys: []sql.SQLTableForeignKey{
+						{Name: "Table2_FK", Columns: []string{"Column3"}, ReferencedTable: "Table1", ReferencedColumns: []string{"Column1"}, UpdateAction: sql.NoAction, DeleteAction: sql.NoAction},
+					},
+					Indexes: []sql.SQLTableIndex{
+						{Name: "Table3_IDX", Type: "btree", Columns: []string{"Column1"}, Options: map[string]interface{}{"test1": 1}},
+					},
+				},
+			},
+		},
+		"Table3": {
+			schema: &sql.SQLTable{
 				SchemaType: entities.SQLTable,
 				Version:    "1",
 				Name:       "Table2",
 				Columns: []sql.SQLTableColumn{
-					{Name: "Column1", Type: "timestamptz", IsNullable: true, Position: 1},
-					{Name: "Column2", Type: "varying character(10)", IsNullable: true, Position: 2},
-					{Name: "Column3", Type: "bigint", IsNullable: true, Position: 3},
-				},
-				Constraints: []sql.SQLTableConstraint{
-					{Type: sql.PrimaryKey, Name: "Column1_pk", Columns: []string{"Column1"}},
+					{Name: "Column2", Type: "varying character(10)", IsNullable: true, Position: 1},
+					{Name: "Column3", Type: "bigint", IsNullable: true, Position: 2},
 				},
 				ForeignKeys: []sql.SQLTableForeignKey{
 					{Name: "Table2_FK", Columns: []string{"Column3"}, ReferencedTable: "Table1", ReferencedColumns: []string{"Column1"}, UpdateAction: sql.NoAction, DeleteAction: sql.NoAction},
 				},
-				Indexes: []sql.SQLTableIndex{
-					{Name: "Table3_IDX", Type: "btree", Columns: []string{"Column1"}, Options: map[string]interface{}{"test1": 1}},
+			},
+			toDiff: []entities.Schema{
+				&sql.SQLTable{
+					SchemaType: entities.SQLTable,
+					Version:    "1",
+					Name:       "Table2",
+					Columns: []sql.SQLTableColumn{
+						{Name: "Column1", Type: "timestamptz", IsNullable: true, Position: 1},
+						{Name: "Column2", Type: "varying character(10)", IsNullable: true, Position: 2},
+						{Name: "Column3", Type: "bigint", IsNullable: true, Position: 3},
+					},
+					Constraints: []sql.SQLTableConstraint{
+						{Type: sql.PrimaryKey, Name: "Column1_pk", Columns: []string{"Column1"}},
+					},
+					ForeignKeys: []sql.SQLTableForeignKey{
+						{Name: "Table2_FK", Columns: []string{"Column3"}, ReferencedTable: "Table1", ReferencedColumns: []string{"Column1"}, UpdateAction: sql.NoAction, DeleteAction: sql.NoAction},
+					},
+					Indexes: []sql.SQLTableIndex{
+						{Name: "Table3_IDX", Type: "btree", Columns: []string{"Column1"}, Options: map[string]interface{}{"test1": 1}},
+					},
+				},
+				&sql.SQLTable{
+					SchemaType: entities.SQLTable,
+					Version:    "1",
+					Name:       "Table2",
+					Columns: []sql.SQLTableColumn{
+						{Name: "Column1", Type: "timestamptz", IsNullable: true, Position: 1},
+						{Name: "Column2", Type: "varying character(10)", IsNullable: true, Position: 2},
+						{Name: "Column3", Type: "bigint", IsNullable: true, Position: 3},
+						{Name: "Column4", Type: "boolean", IsNullable: true, Position: 4},
+					},
+					Constraints: []sql.SQLTableConstraint{
+						{Type: sql.PrimaryKey, Name: "Column1_pk", Columns: []string{"Column1"}},
+					},
+					ForeignKeys: []sql.SQLTableForeignKey{
+						{Name: "Table2_FK", Columns: []string{"Column3"}, ReferencedTable: "Table1", ReferencedColumns: []string{"Column1"}, UpdateAction: sql.NoAction, DeleteAction: sql.NoAction},
+					},
+					Indexes: []sql.SQLTableIndex{
+						{Name: "Table3_IDX", Type: "btree", Columns: []string{"Column1"}, Options: map[string]interface{}{"test1": 1}},
+					},
 				},
 			},
 		},
@@ -156,7 +240,7 @@ func TestBinaryBackup(t *testing.T) {
 	err = backupWriter.BeginSnapshot(&rollbackSnapshot)
 	assert.Nil(t, err)
 
-	err = backupWriter.SaveSchemaDependency(dependenciesMap["Sequence1"].dependency)
+	err = backupWriter.SaveSchemaDependency(dependenciesMap["Sequence3"].dependency)
 	assert.Nil(t, err)
 
 	err = backupWriter.RollbackSnapshot()
@@ -170,13 +254,20 @@ func TestBinaryBackup(t *testing.T) {
 		assert.Nil(t, err)
 
 		snapshot.SchemaDependencies[k] = v.dependency.Hash()
+		currentState := v.dependency
 
-		if v.toDiff != nil {
-			diff := v.toDiff.Diff(v.dependency)
+		for i, diffValue := range v.toDiff {
+			var isDiff bool = false
+			if i > 0 {
+				isDiff = true
+			}
+
+			diff := diffValue.Diff(currentState, isDiff)
 			err = backupWriter.SaveSchemaDependencyDiff(diff)
 			assert.Nil(t, err)
 
 			snapshot.SchemaDependencies[k] = fmt.Sprintf("diffs/%s", diff.Hash())
+			currentState = diffValue
 		}
 	}
 
@@ -185,13 +276,20 @@ func TestBinaryBackup(t *testing.T) {
 		assert.Nil(t, err)
 
 		snapshot.Schemas[k] = v.schema.Hash()
+		currentState := v.schema
 
-		if v.toDiff != nil {
-			diff := v.toDiff.Diff(v.schema)
+		for i, diffValue := range v.toDiff {
+			var isDiff bool = false
+			if i > 0 {
+				isDiff = true
+			}
+
+			diff := diffValue.Diff(currentState, isDiff)
 			err = backupWriter.SaveSchemaDiff(diff)
 			assert.Nil(t, err)
 
 			snapshot.Schemas[k] = fmt.Sprintf("diffs/%s", diff.Hash())
+			currentState = diffValue
 		}
 	}
 
@@ -212,13 +310,13 @@ func TestBinaryBackup(t *testing.T) {
 		assert.Equal(t, snapshot.SnapshotId, readSnapshot.SnapshotId)
 
 		for k, dependency := range readSnapshot.SchemaDependencies {
-			readDependency, err := backupReader.GetSchemaDependency(dependency)
+			readDependency, _, err := backupReader.GetSchemaDependency(dependency)
 			assert.Nil(t, err)
 			assert.Equal(t, expectedDependencies[k], readDependency)
 		}
 
 		for k, schema := range readSnapshot.Schemas {
-			readSchema, err := backupReader.GetSchema(schema)
+			readSchema, _, err := backupReader.GetSchema(schema)
 			assert.Nil(t, err)
 			assert.Equal(t, expectedSchemas[k], readSchema)
 		}

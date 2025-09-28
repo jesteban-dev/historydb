@@ -10,6 +10,6 @@ import "historydb/src/internal/entities"
 type BackupReader interface {
 	GetBackupMetadata() (entities.BackupMetadata, error)
 	GetBackupSnapshot(snapshotId string) (entities.BackupSnapshot, error)
-	GetSchemaDependency(filename string) (entities.SchemaDependency, error)
-	GetSchema(filename string) (entities.Schema, error)
+	GetSchemaDependency(dependencyRef string) (entities.SchemaDependency, bool, error)
+	GetSchema(filename string) (entities.Schema, bool, error)
 }

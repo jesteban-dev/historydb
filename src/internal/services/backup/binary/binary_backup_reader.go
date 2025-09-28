@@ -75,95 +75,97 @@ func (reader *BinaryBackupReader) GetBackupSnapshot(snapshotId string) (entities
 	return snapshot, nil
 }
 
-func (reader *BinaryBackupReader) GetSchemaDependency(filename string) (entities.SchemaDependency, error) {
-	pathToFile := filepath.Join(reader.backupPath, "schemas", "dependencies", fmt.Sprintf("%s.hdb", filename))
+func (reader *BinaryBackupReader) GetSchemaDependency(dependencyRef string) (entities.SchemaDependency, bool, error) {
+	pathToFile := filepath.Join(reader.backupPath, "schemas", "dependencies", fmt.Sprintf("%s.hdb", dependencyRef))
 	data, err := os.ReadFile(pathToFile)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	if len(data) < sha256.Size {
-		return nil, fmt.Errorf("%w: %s", services.ErrBackupCorruptedFile, pathToFile)
+		return nil, false, fmt.Errorf("%w: %s", services.ErrBackupCorruptedFile, pathToFile)
 	}
 
 	hashBytes := data[:sha256.Size]
 	content := data[sha256.Size:]
 
 	if ok := crypto.CheckDataSignature(hashBytes, content); !ok {
-		return nil, fmt.Errorf("%w: %s", services.ErrBackupCorruptedFile, pathToFile)
+		return nil, false, fmt.Errorf("%w: %s", services.ErrBackupCorruptedFile, pathToFile)
 	}
 
-	if strings.HasPrefix(filename, "diffs") {
+	if strings.HasPrefix(dependencyRef, "diffs") {
 		prevRef, err := decode.DecodeString(bytes.NewBuffer(content))
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 
-		dependency, err := reader.GetSchemaDependency(*prevRef)
+		dependency, _, err := reader.GetSchemaDependency(*prevRef)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 
 		dependencyDiff, err := reader.readSchemaDependencyDiffByType(dependency.GetDependencyType(), content)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 
 		dependency = dependency.ApplyDiff(dependencyDiff)
-		return dependency, nil
+		return dependency, true, nil
 	} else {
 		dependencyType, err := decode.DecodeString(bytes.NewBuffer(content))
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 
-		return reader.readSchemaDependencyByType(entities.DependencyType(*dependencyType), content)
+		dependency, err := reader.readSchemaDependencyByType(entities.DependencyType(*dependencyType), content)
+		return dependency, true, err
 	}
 }
 
-func (reader *BinaryBackupReader) GetSchema(filename string) (entities.Schema, error) {
+func (reader *BinaryBackupReader) GetSchema(filename string) (entities.Schema, bool, error) {
 	pathToFile := filepath.Join(reader.backupPath, "schemas", fmt.Sprintf("%s.hdb", filename))
 	data, err := os.ReadFile(pathToFile)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	if len(data) < sha256.Size {
-		return nil, fmt.Errorf("%w: %s", services.ErrBackupCorruptedFile, pathToFile)
+		return nil, false, fmt.Errorf("%w: %s", services.ErrBackupCorruptedFile, pathToFile)
 	}
 
 	hashBytes := data[:sha256.Size]
 	content := data[sha256.Size:]
 
 	if ok := crypto.CheckDataSignature(hashBytes, content); !ok {
-		return nil, fmt.Errorf("%w: %s", services.ErrBackupCorruptedFile, pathToFile)
+		return nil, false, fmt.Errorf("%w: %s", services.ErrBackupCorruptedFile, pathToFile)
 	}
 
 	if strings.HasPrefix(filename, "diffs") {
 		prevRef, err := decode.DecodeString(bytes.NewBuffer(content))
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 
-		schema, err := reader.GetSchema(*prevRef)
+		schema, _, err := reader.GetSchema(*prevRef)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 
 		schemaDiff, err := reader.readSchemaDiffByType(schema.GetSchemaType(), content)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 
 		schema = schema.ApplyDiff(schemaDiff)
-		return schema, nil
+		return schema, true, nil
 	} else {
 		schemaType, err := decode.DecodeString(bytes.NewBuffer(content))
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 
-		return reader.readSchemaByType(entities.SchemaType(*schemaType), content)
+		schema, err := reader.readSchemaByType(entities.SchemaType(*schemaType), content)
+		return schema, false, err
 	}
 }
 

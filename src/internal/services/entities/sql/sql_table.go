@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"historydb/src/internal/entities"
 	"historydb/src/internal/utils/decode"
 	"historydb/src/internal/utils/encode"
@@ -37,12 +38,19 @@ func (table *SQLTable) Hash() string {
 	return hex.EncodeToString(hash[:])
 }
 
-func (table *SQLTable) Diff(schema entities.Schema) entities.SchemaDiff {
+func (table *SQLTable) Diff(schema entities.Schema, isDiff bool) entities.SchemaDiff {
 	oldTable := schema.(*SQLTable)
+
+	var prevRef string
+	if isDiff {
+		prevRef = fmt.Sprintf("diffs/%s", schema.Hash())
+	} else {
+		prevRef = schema.Hash()
+	}
 
 	diff := SQLTableDiff{
 		hash:    table.Hash(),
-		PrevRef: schema.Hash(),
+		PrevRef: prevRef,
 	}
 	diff.AddedColumns, diff.RemovedColumns = types.DiffSlices(table.Columns, oldTable.Columns)
 	diff.AddedConstraints, diff.RemovedConstraints = types.DiffSlices(table.Constraints, oldTable.Constraints)

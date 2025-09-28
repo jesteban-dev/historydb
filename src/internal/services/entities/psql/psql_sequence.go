@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"historydb/src/internal/entities"
 	"historydb/src/internal/utils/comparation"
 	"historydb/src/internal/utils/decode"
@@ -41,12 +42,19 @@ func (seq *PSQLSequence) Hash() string {
 	return hex.EncodeToString(hash[:])
 }
 
-func (seq *PSQLSequence) Diff(dependency entities.SchemaDependency) entities.SchemaDependencyDiff {
+func (seq *PSQLSequence) Diff(dependency entities.SchemaDependency, isDiff bool) entities.SchemaDependencyDiff {
 	oldSeq := dependency.(*PSQLSequence)
+
+	var prevRef string
+	if isDiff {
+		prevRef = fmt.Sprintf("diffs/%s", dependency.Hash())
+	} else {
+		prevRef = dependency.Hash()
+	}
 
 	diff := PSQLSequenceDiff{
 		hash:    seq.Hash(),
-		PrevRef: dependency.Hash(),
+		PrevRef: prevRef,
 	}
 	comparation.AssignIfChanged(&diff.Type, &seq.Type, &oldSeq.Type)
 	comparation.AssignIfChanged(&diff.Start, &seq.Start, &oldSeq.Start)

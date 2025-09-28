@@ -185,7 +185,7 @@ func (uc *BackupUsecasesImpl) SnapshotSchemaDependencies(lastSnapshot, snapshot 
 			snapshot.SchemaDependencies[dependency.GetName()] = hash
 		} else if !crypto.CompareHashes(prevHash, hash) {
 			// Updates dependency into backup
-			prevDependency, err := backupReader.GetSchemaDependency(prevHash)
+			prevDependency, isDiff, err := backupReader.GetSchemaDependency(prevHash)
 			if err != nil {
 				if errors.Is(err, services.ErrBackupCorruptedFile) {
 					fmt.Printf("The %s schema dependency in backup is corrupted\n", dependency.GetName())
@@ -194,7 +194,7 @@ func (uc *BackupUsecasesImpl) SnapshotSchemaDependencies(lastSnapshot, snapshot 
 				return false
 			}
 
-			dependencyDiff := dependency.Diff(prevDependency)
+			dependencyDiff := dependency.Diff(prevDependency, isDiff)
 			if err := backupWriter.SaveSchemaDependencyDiff(dependencyDiff); err != nil {
 				uc.logger.Errorf("could not update %s schema dependency into backup: %v\n", dependency.GetName(), err)
 				return false
@@ -286,7 +286,7 @@ func (uc *BackupUsecasesImpl) SnapshotSchemas(lastSnapshot, snapshot *entities.B
 			snapshot.Schemas[schemaName] = hash
 		} else if !crypto.CompareHashes(prevHash, hash) {
 			// Updates schema into backup
-			prevSchema, err := backupReader.GetSchema(prevHash)
+			prevSchema, isDiff, err := backupReader.GetSchema(prevHash)
 			if err != nil {
 				if errors.Is(err, services.ErrBackupCorruptedFile) {
 					fmt.Printf("The %s schema in backup is corrupted\n", schema.GetName())
@@ -296,7 +296,7 @@ func (uc *BackupUsecasesImpl) SnapshotSchemas(lastSnapshot, snapshot *entities.B
 				return nil
 			}
 
-			schemaDiff := schema.Diff(prevSchema)
+			schemaDiff := schema.Diff(prevSchema, isDiff)
 			if err := backupWriter.SaveSchemaDiff(schemaDiff); err != nil {
 				uc.logger.Errorf("could not update %s schema definition into backup: %v\n", schemaName, err)
 				return nil
