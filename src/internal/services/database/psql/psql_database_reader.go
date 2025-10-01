@@ -208,7 +208,7 @@ func (reader *PSQLDatabaseReader) GetSchemaRecordChunk(schema entities.Schema, c
 		}
 
 		// Save data in SQLRecord
-		row := sql_entities.SQLRecord{}
+		row := make(map[string]interface{})
 		for i, col := range table.Columns {
 			var val interface{}
 			raw := values[i]
@@ -238,7 +238,7 @@ func (reader *PSQLDatabaseReader) GetSchemaRecordChunk(schema entities.Schema, c
 			}
 		}
 
-		results = append(results, row)
+		results = append(results, sql_entities.SQLRecord{Content: row})
 	}
 
 	cursor.Offset += chunkSize

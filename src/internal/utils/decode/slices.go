@@ -90,8 +90,8 @@ func DecodeSlice[T Decodable[T]](buf *bytes.Buffer) ([]T, error) {
 			return nil, err
 		}
 
-		var item T
-		item, err = item.DecodeFromBytes(itemBytes[:n])
+		var v T
+		item, err := v.DecodeFromBytes(itemBytes[:n])
 		if err != nil {
 			return nil, err
 		}

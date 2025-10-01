@@ -23,6 +23,14 @@ type SchemaInfo struct {
 	toDiff []entities.Schema
 }
 
+type RecordBatchInfo struct {
+	batchName   string
+	batchType   entities.RecordType
+	chunks      []entities.SchemaRecordChunk
+	toDiffNames []string
+	toDiff      [][]entities.SchemaRecordChunk
+}
+
 var expectedDependencies map[string]entities.SchemaDependency = map[string]entities.SchemaDependency{
 	"Sequence1": &psql.PSQLSequence{DependencyType: entities.PSQLSequence, Version: "1", Name: "Sequence1", Type: "integer", Start: 1, Min: 1, Max: 1000, Increment: 1, IsCycle: false, LastValue: 20, IsCalled: false},
 	"Sequence2": &psql.PSQLSequence{DependencyType: entities.PSQLSequence, Version: "1", Name: "Sequence2", Type: "integer", Start: 20, Min: 2, Max: 100, Increment: 2, IsCycle: false, LastValue: 40, IsCalled: true},
@@ -83,6 +91,49 @@ var expectedSchemas map[string]entities.Schema = map[string]entities.Schema{
 	},
 }
 
+var expectedRecordBatch map[string][]RecordBatchInfo = map[string][]RecordBatchInfo{
+	"Table1": {
+		{batchName: "Batch1-1", chunks: []entities.SchemaRecordChunk{
+			&sql.SQLRecordChunk{Content: []sql.SQLRecord{
+				{Content: map[string]interface{}{"Column1": 1, "Column2": "test1"}},
+				{Content: map[string]interface{}{"Column1": 2, "Column2": "test2"}},
+			}},
+			&sql.SQLRecordChunk{Content: []sql.SQLRecord{
+				{Content: map[string]interface{}{"Column1": 3, "Column2": "test3"}},
+				{Content: map[string]interface{}{"Column1": 4, "Column2": "test4"}},
+			}},
+		}},
+		{batchName: "Batch1-2", chunks: []entities.SchemaRecordChunk{
+			&sql.SQLRecordChunk{Content: []sql.SQLRecord{
+				{Content: map[string]interface{}{"Column1": 5, "Column2": "test5"}},
+				{Content: map[string]interface{}{"Column1": 6, "Column2": "test6"}},
+			}},
+		}},
+	},
+	"Table2": {
+		{batchName: "Batch2-1", chunks: []entities.SchemaRecordChunk{
+			&sql.SQLRecordChunk{Content: []sql.SQLRecord{
+				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test1", "Column3": 1}},
+				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test3", "Column3": 3}},
+				{Content: map[string]interface{}{"Column1": time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test4", "Column3": 4}},
+			}},
+		}},
+	},
+	"Table3": {
+		{batchName: "Batch3-1", chunks: []entities.SchemaRecordChunk{
+			&sql.SQLRecordChunk{Content: []sql.SQLRecord{
+				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test2", "Column3": 2, "Column4": true}},
+				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test10", "Column3": 10, "Column4": false}},
+			}},
+			&sql.SQLRecordChunk{Content: []sql.SQLRecord{
+				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test3", "Column3": 3, "Column4": true}},
+				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test4", "Column3": 4, "Column4": true}},
+				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test11", "Column3": 11, "Column4": false}},
+			}},
+		}},
+	},
+}
+
 func TestBinaryBackup(t *testing.T) {
 	backupFactory := binary.NewBinaryBackupFactory("test")
 	assert.NotNil(t, backupFactory)
@@ -110,6 +161,7 @@ func TestBinaryBackup(t *testing.T) {
 		SnapshotId:         "test-snapshot",
 		SchemaDependencies: make(map[string]string),
 		Schemas:            make(map[string]string),
+		Data:               make(map[string]entities.BackupSnapshotSchemaData),
 	}
 
 	dependenciesMap := map[string]SchemaDependecyInfo{
@@ -236,6 +288,96 @@ func TestBinaryBackup(t *testing.T) {
 			},
 		},
 	}
+	recordBatchMap := map[string][]RecordBatchInfo{
+		"Table1": {
+			{
+				batchName: "Batch1-1",
+				batchType: entities.SQLRecord,
+				chunks: []entities.SchemaRecordChunk{
+					&sql.SQLRecordChunk{Content: []sql.SQLRecord{
+						{Content: map[string]interface{}{"Column1": 1, "Column2": "test1"}},
+						{Content: map[string]interface{}{"Column1": 2, "Column2": "test2"}},
+					}},
+					&sql.SQLRecordChunk{Content: []sql.SQLRecord{
+						{Content: map[string]interface{}{"Column1": 3, "Column2": "test3"}},
+						{Content: map[string]interface{}{"Column1": 4, "Column2": "test4"}},
+					}},
+				},
+			}, {
+				batchName: "Batch1-2",
+				batchType: entities.SQLRecord,
+				chunks: []entities.SchemaRecordChunk{
+					&sql.SQLRecordChunk{Content: []sql.SQLRecord{
+						{Content: map[string]interface{}{"Column1": 5, "Column2": "test5"}},
+						{Content: map[string]interface{}{"Column1": 6, "Column2": "test6"}},
+					}},
+				},
+			},
+		},
+		"Table2": {
+			{
+				batchName: "Batch2-1",
+				batchType: entities.SQLRecord,
+				chunks: []entities.SchemaRecordChunk{
+					&sql.SQLRecordChunk{Content: []sql.SQLRecord{
+						{Content: map[string]interface{}{"Column2": "test1", "Column3": 1}},
+						{Content: map[string]interface{}{"Column2": "test2", "Column3": 2}},
+						{Content: map[string]interface{}{"Column2": "test3", "Column3": 3}},
+					}},
+				},
+				toDiffNames: []string{"diffs/Batch2-1"},
+				toDiff: [][]entities.SchemaRecordChunk{
+					{
+						&sql.SQLRecordChunk{Content: []sql.SQLRecord{
+							{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test1", "Column3": 1}},
+							{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test3", "Column3": 3}},
+							{Content: map[string]interface{}{"Column1": time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test4", "Column3": 4}},
+						}},
+					},
+				},
+			},
+		},
+		"Table3": {
+			{
+				batchName: "Batch3-1",
+				batchType: entities.SQLRecord,
+				chunks: []entities.SchemaRecordChunk{
+					&sql.SQLRecordChunk{Content: []sql.SQLRecord{
+						{Content: map[string]interface{}{"Column2": "test1", "Column3": 1}},
+						{Content: map[string]interface{}{"Column2": "test2", "Column3": 2}},
+					}},
+					&sql.SQLRecordChunk{Content: []sql.SQLRecord{
+						{Content: map[string]interface{}{"Column2": "test3", "Column3": 3}},
+						{Content: map[string]interface{}{"Column2": "test4", "Column3": 4}},
+					}},
+				},
+				toDiffNames: []string{"diffs/Batch3-1-1", "diffs/Batch3-1-2"},
+				toDiff: [][]entities.SchemaRecordChunk{
+					{
+						&sql.SQLRecordChunk{Content: []sql.SQLRecord{
+							{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test1", "Column3": 1}},
+							{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test2", "Column3": 2}},
+							{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test10", "Column3": 10}},
+						}},
+						&sql.SQLRecordChunk{Content: []sql.SQLRecord{
+							{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test3", "Column3": 3}},
+							{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test4", "Column3": 4}},
+						}},
+					}, {
+						&sql.SQLRecordChunk{Content: []sql.SQLRecord{
+							{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test2", "Column3": 2, "Column4": true}},
+							{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test10", "Column3": 10, "Column4": false}},
+						}},
+						&sql.SQLRecordChunk{Content: []sql.SQLRecord{
+							{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test3", "Column3": 3, "Column4": true}},
+							{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test4", "Column3": 4, "Column4": true}},
+							{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test11", "Column3": 11, "Column4": false}},
+						}},
+					},
+				},
+			},
+		},
+	}
 
 	err = backupWriter.BeginSnapshot(&rollbackSnapshot)
 	assert.Nil(t, err)
@@ -293,6 +435,40 @@ func TestBinaryBackup(t *testing.T) {
 		}
 	}
 
+	for k, v := range recordBatchMap {
+		batches := []string{}
+		for i, batch := range v {
+			batchTempRef := fmt.Sprintf("temp-%s", batch.batchName)
+			for _, chunk := range batch.chunks {
+				err = backupWriter.SaveSchemaRecordChunk(batchTempRef, batch.batchType, chunk)
+				assert.Nil(t, err)
+			}
+
+			err = backupWriter.SaveSchemaRecordBatch(batchTempRef, batch.batchName)
+			assert.Nil(t, err)
+			batches = append(batches, batch.batchName)
+
+			for j, diffValue := range batch.toDiff {
+				for l, chunkDiff := range diffValue {
+					if len(batch.chunks) > l {
+						diff := chunkDiff.Diff(batch.chunks[l], false)
+
+						err = backupWriter.SaveSchemaRecordChunkDiff(batch.batchName, batch.toDiffNames[j], batch.batchType, diff)
+						assert.Nil(t, err)
+
+						batches[i] = batch.toDiffNames[j]
+					}
+				}
+			}
+
+			snapshot.Data[k] = entities.BackupSnapshotSchemaData{
+				BatchSize: 100,
+				ChunkSize: 100,
+				Data:      batches,
+			}
+		}
+	}
+
 	err = backupWriter.CommitSnapshot(&metadata)
 	assert.Nil(t, err)
 
@@ -319,6 +495,23 @@ func TestBinaryBackup(t *testing.T) {
 			readSchema, _, err := backupReader.GetSchema(schema)
 			assert.Nil(t, err)
 			assert.Equal(t, expectedSchemas[k], readSchema)
+		}
+
+		for k, dataBatches := range readSnapshot.Data {
+			for i, batch := range dataBatches.Data {
+				chunkRefs, err := backupReader.GetSchemaRecordChunkRefsInBatch(batch)
+				assert.Nil(t, err)
+				assert.Equal(t, len(expectedRecordBatch[k][i].chunks), len(chunkRefs))
+
+				for j, chunkRef := range chunkRefs {
+					expectedRecordBatch[k][i].chunks[j].Hash()
+					chunk, _, err := backupReader.GetSchemaRecordChunk(batch, chunkRef)
+					chunk.Hash()
+
+					assert.Nil(t, err)
+					assert.Equal(t, expectedRecordBatch[k][i].chunks[j], chunk)
+				}
+			}
 		}
 	}
 
