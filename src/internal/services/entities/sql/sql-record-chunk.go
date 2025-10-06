@@ -33,6 +33,10 @@ func (chunk *SQLRecordChunk) Hash() string {
 	return chunk.hash
 }
 
+func (chunk *SQLRecordChunk) GetRecordType() entities.RecordType {
+	return entities.SQLRecord
+}
+
 func (chunk *SQLRecordChunk) Diff(recordChunk entities.SchemaRecordChunk, isDiff bool) entities.SchemaRecordChunkDiff {
 	oldChunk := recordChunk.(*SQLRecordChunk)
 
@@ -58,6 +62,32 @@ func (chunk *SQLRecordChunk) Diff(recordChunk entities.SchemaRecordChunk, isDiff
 	diff.Content = records
 
 	return &diff
+}
+
+func (chunk *SQLRecordChunk) DiffFromEmpty() entities.SchemaRecordChunkDiff {
+	diff := SQLRecordChunkDiff{
+		hash: pointers.Ptr(chunk.Hash()),
+	}
+	records := []SQLRecordDiff{}
+	for _, record := range chunk.Content {
+		records = append(records, SQLRecordDiff{PrevRef: nil, Record: record.Content})
+	}
+	diff.Content = records
+
+	return &diff
+}
+
+func (chunk *SQLRecordChunk) DiffToEmpty(isDiff bool) entities.SchemaRecordChunkDiff {
+	var prevRef string
+	if isDiff {
+		prevRef = fmt.Sprintf("diffs/%s", chunk.Hash())
+	} else {
+		prevRef = chunk.Hash()
+	}
+
+	return &SQLRecordChunkDiff{
+		PrevRef: &prevRef,
+	}
 }
 
 func (chunk *SQLRecordChunk) ApplyDiff(diff entities.SchemaRecordChunkDiff) entities.SchemaRecordChunk {
@@ -155,6 +185,10 @@ func (diff *SQLRecordChunkDiff) Hash() *string {
 
 func (diff *SQLRecordChunkDiff) GetPrevRef() *string {
 	return diff.PrevRef
+}
+
+func (diff *SQLRecordChunkDiff) GetRecordType() entities.RecordType {
+	return entities.SQLRecord
 }
 
 func (diff *SQLRecordChunkDiff) ApplyDiffFromEmpty() entities.SchemaRecordChunk {

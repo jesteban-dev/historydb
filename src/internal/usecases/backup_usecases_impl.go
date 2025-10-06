@@ -13,6 +13,7 @@ import (
 	"historydb/src/internal/utils/crypto"
 	"math"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -316,10 +317,11 @@ func (uc *BackupUsecasesImpl) SnapshotSchemas(lastSnapshot, snapshot *entities.B
 	return schemas
 }
 
-func (uc *BackupUsecasesImpl) BackupSchemaData(snapshot *entities.BackupSnapshot, schema entities.Schema) bool {
+func (uc *BackupUsecasesImpl) BackupSchemaRecords(snapshot *entities.BackupSnapshot, schema entities.Schema) bool {
 	dbReader := uc.dbFactory.CreateReader()
 	backupWriter := uc.backupFactory.CreateWriter()
 
+	// Calculates batch and chunk sizes
 	recordMetadata, err := dbReader.GetSchemaRecordMetadata(schema.GetName())
 	if err != nil {
 		uc.logger.Errorf("could not retrieve %s schema record metadata: %v\n", schema.GetName(), err)
@@ -335,19 +337,23 @@ func (uc *BackupUsecasesImpl) BackupSchemaData(snapshot *entities.BackupSnapshot
 		chunkSize = batchSize / 10
 	}
 
+	// Loops until savedRecords == Database total records
 	savedRecords := 0
 	batchHashes := []string{}
 	dataProgress := progressbar.NewOptions(int(math.Ceil(float64(recordMetadata.Count)/float64(chunkSize))), progressbar.OptionSetDescription(fmt.Sprintf("  + Saving %s schema data...", schema.GetName())), progressbar.OptionSetWidth(30), progressbar.OptionSetWriter(os.Stdout), progressbar.OptionSetRenderBlankState(true))
+
 	for savedRecords < recordMetadata.Count {
 		currentBatchSize := 0
 		tempBatchName := uuid.NewString()
 		batchHashBytes := sha256.New()
 
+		// Loops until batch is full or there is no more content
 		var cursor interface{}
 		for currentBatchSize < batchSize {
+			// Reads record chunk from DB
 			chunk, nextCursor, err := dbReader.GetSchemaRecordChunk(schema, chunkSize, cursor)
 			if err != nil {
-				uc.logger.Errorf("could not retrieve record chunk from %s schema: %v\n", schema.GetName(), err)
+				uc.logger.Errorf("coudl not retrieve record chunk from %s schema: %v\n", schema.GetName(), err)
 				return false
 			}
 
@@ -357,6 +363,7 @@ func (uc *BackupUsecasesImpl) BackupSchemaData(snapshot *entities.BackupSnapshot
 				currentBatchSize += chunk.Length()
 			}
 
+			// Saves chunks in backup temporal batch file
 			chunkHash := chunk.Hash()
 			if err := backupWriter.SaveSchemaRecordChunk(tempBatchName, chunk); err != nil {
 				uc.logger.Errorf("could not save record chunk in backup: %v\n", err)
@@ -369,9 +376,10 @@ func (uc *BackupUsecasesImpl) BackupSchemaData(snapshot *entities.BackupSnapshot
 			dataProgress.Add(1)
 		}
 
+		// After full batch is completed, renames the temp batch file to the final one
 		batchHash := hex.EncodeToString(batchHashBytes.Sum(nil))
 		if err := backupWriter.SaveSchemaRecordBatch(tempBatchName, batchHash); err != nil {
-			uc.logger.Errorf("Could not save data batch in backup: %v\n", err)
+			uc.logger.Errorf("could not save record batch in backup: %v\n", err)
 			return false
 		}
 
@@ -388,7 +396,7 @@ func (uc *BackupUsecasesImpl) BackupSchemaData(snapshot *entities.BackupSnapshot
 	return true
 }
 
-func (uc *BackupUsecasesImpl) SnapshotSchemaData(lastSnapshot, snapshot *entities.BackupSnapshot, schema entities.Schema) bool {
+func (uc *BackupUsecasesImpl) SnapshotSchemaRecords(lastSnapshot, snapshot *entities.BackupSnapshot, schema entities.Schema) bool {
 	dbReader := uc.dbFactory.CreateReader()
 	backupReader := uc.backupFactory.CreateReader()
 	backupWriter := uc.backupFactory.CreateWriter()
@@ -407,13 +415,21 @@ func (uc *BackupUsecasesImpl) SnapshotSchemaData(lastSnapshot, snapshot *entitie
 
 	savedRecords := 0
 	batchIndex := 0
+	snapshotData := entities.BackupSnapshotSchemaData{
+		BatchSize: backupMetadata.BatchSize,
+		ChunkSize: backupMetadata.ChunkSize,
+		Data:      []string{},
+	}
+	// Loops until savedRecords == Database total records
 	for savedRecords < recordMetadata.Count {
 		currentBatchSize := 0
 		batchHashBytes := sha256.New()
 		batchChunks := []dtos.BatchChunkInfo{}
 
+		// Calculates all new chunk hashes in batch
 		var cursor interface{}
 		for currentBatchSize < backupMetadata.BatchSize {
+			// Reads record chunk from DB
 			chunk, nextCursor, err := dbReader.GetSchemaRecordChunk(schema, backupMetadata.ChunkSize, cursor)
 			if err != nil {
 				uc.logger.Errorf("could not retrieve record chunk from %s schema: %v\n", schema.GetName(), err)
@@ -426,6 +442,7 @@ func (uc *BackupUsecasesImpl) SnapshotSchemaData(lastSnapshot, snapshot *entitie
 				currentBatchSize += chunk.Length()
 			}
 
+			// Saves chunk hash and cursor if then is needed
 			chunkHash := chunk.Hash()
 			batchChunks = append(batchChunks, dtos.BatchChunkInfo{Hash: chunkHash, Cursor: cursor})
 			cursor = nextCursor
@@ -433,39 +450,98 @@ func (uc *BackupUsecasesImpl) SnapshotSchemaData(lastSnapshot, snapshot *entitie
 			batchHashBytes.Write([]byte("|"))
 		}
 
+		// Calculates new batch hash
 		batchHash := hex.EncodeToString(batchHashBytes.Sum(nil))
+
 		if len(backupMetadata.Data) > batchIndex {
-			// Compare Batch hashes, if it is equal we continue to the next batch
-			if !crypto.CompareHashes(backupMetadata.Data[batchIndex], batchHash) {
-				// Compare each chunk hash
-				backupChunks, err := backupReader.GetSchemaDataChunkRefsInBatch(batchHash)
+			// Current batch is in backup -> Compare hashes, if it is equal we continue to the next batch
+			oldBatchHash, _ := strings.CutPrefix(backupMetadata.Data[batchIndex], "diffs/")
+
+			if !crypto.CompareHashes(oldBatchHash, batchHash) {
+				// Retrieve backup chunks
+				backupChunks, err := backupReader.GetSchemaRecordChunkRefsInBatch(backupMetadata.Data[batchIndex])
 				if err != nil {
 					uc.logger.Errorf("could not retrieve chunks from backup batch in %s schema: %v\n", schema.GetName(), err)
 					return false
 				}
 
+				// Compare each chunk hash -> If they match, continue to next chunk
 				for i := 0; i < int(math.Max(float64(len(backupChunks)), float64(len(batchChunks)))); i++ {
-					// If chunk hashes matches we continue to the next chunk
-					if i < len(backupChunks) && i < len(batchChunks) && !crypto.CompareHashes(backupChunks[i], batchChunks[i].Hash) {
-						// Chunk hash in backup does not match new chunk hash -> Replace chunk
-						_, _, err := dbReader.GetSchemaRecordChunk(schema, backupMetadata.ChunkSize, batchChunks[i].Cursor)
+					var recordDiff entities.SchemaRecordChunkDiff
+
+					if i >= len(batchChunks) {
+						// Chunk does not exist in new batch -> Delete chunk from bakup batch
+						backupChunk, isDiff, err := backupReader.GetSchemaRecordChunk(backupMetadata.Data[batchIndex], backupChunks[i])
+						if err != nil {
+							uc.logger.Errorf("could not retrieve record chunk from backup: %v\n", err)
+							return false
+						}
+
+						recordDiff = backupChunk.DiffToEmpty(isDiff)
+					} else {
+						recordChunk, _, err := dbReader.GetSchemaRecordChunk(schema, backupMetadata.ChunkSize, batchChunks[i].Cursor)
 						if err != nil {
 							uc.logger.Errorf("could not retrieve record chunk from %s schema: %v\n", schema.GetName(), err)
 							return false
 						}
 
-						_, err = backupReader.
-					} else if i >= len(backupChunks) {
-						// Chunk does not exist in backup -> Create new chunk in backup batch
-					} else if i >= len(batchChunks) {
-						// Chunk does not exist in new batch -> Delete chunk from backup batch
+						if i < len(backupChunks) && i < len(batchChunks) && !crypto.CompareHashes(backupChunks[i], batchChunks[i].Hash) {
+							// Chunk hashes does not match -> Replace chunk
+
+							// Reads old chunk from backup
+							backupChunk, isDiff, err := backupReader.GetSchemaRecordChunk(backupMetadata.Data[batchIndex], backupChunks[i])
+							if err != nil {
+								uc.logger.Errorf("could not retrieve record chunk from backup: %v\n", err)
+								return false
+							}
+
+							recordDiff = recordChunk.Diff(backupChunk, isDiff)
+						} else if i >= len(backupChunks) {
+							// Chunk does not exist in backup -> Create new chunk in backup batch
+							recordDiff = recordChunk.DiffFromEmpty()
+						}
 					}
+
+					if err := backupWriter.SaveSchemaRecordChunkDiff(backupMetadata.Data[batchIndex], batchHash, recordDiff); err != nil {
+						uc.logger.Errorf("could not update %s schema record chunk into backup: %v\n", schema.GetName(), err)
+						return false
+					}
+				}
+
+				snapshotData.Data = append(snapshotData.Data, fmt.Sprintf("diffs/%s", batchHash))
+			} else {
+				snapshotData.Data = append(snapshotData.Data, backupMetadata.Data[batchIndex])
+			}
+		} else {
+			// New batch to save in backup
+			tempBatchName := uuid.NewString()
+
+			for _, chunkData := range batchChunks {
+				// Reads chunk from DB
+				chunk, _, err := dbReader.GetSchemaRecordChunk(schema, backupMetadata.ChunkSize, chunkData.Cursor)
+				if err != nil {
+					uc.logger.Errorf("could not retrieve record chunk from %s schema: %v\n", schema.GetName(), err)
+					return false
+				}
+
+				// Saves chunks in backup temporal batch file
+				if err := backupWriter.SaveSchemaRecordChunk(tempBatchName, chunk); err != nil {
+					uc.logger.Errorf("could not save record chunk in backup: %v\n", err)
+					return false
 				}
 			}
 
-			batchIndex++
+			if err := backupWriter.SaveSchemaRecordBatch(tempBatchName, batchHash); err != nil {
+				uc.logger.Errorf("could not save record batch in backup: %v\n", err)
+				return false
+			}
+
+			snapshotData.Data = append(snapshotData.Data, batchHash)
 		}
+
+		batchIndex++
 	}
 
+	snapshot.Data[schema.GetName()] = snapshotData
 	return true
 }

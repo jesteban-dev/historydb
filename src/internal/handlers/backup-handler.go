@@ -28,6 +28,13 @@ func (handler *BackupHandler) CreateBackup() {
 		return
 	}
 
+	for _, schema := range schemas {
+		if ok := handler.backupUc.BackupSchemaRecords(snapshot, schema); !ok {
+			handler.backupUc.RollbackSnapshot(true)
+			return
+		}
+	}
+
 	if ok := handler.backupUc.CommitSnapshot(nil, snapshot); !ok {
 		handler.backupUc.RollbackSnapshot(true)
 	}
@@ -58,6 +65,20 @@ func (handler *BackupHandler) SnapshotBackup() {
 	if schemas == nil {
 		handler.backupUc.RollbackSnapshot(false)
 		return
+	}
+
+	for _, schema := range schemas {
+		if _, ok := lastSnapshot.Data[schema.GetName()]; !ok {
+			if ok := handler.backupUc.BackupSchemaRecords(newSnapshot, schema); !ok {
+				handler.backupUc.RollbackSnapshot(false)
+				return
+			}
+		} else {
+			if ok := handler.backupUc.SnapshotSchemaRecords(lastSnapshot, newSnapshot, schema); !ok {
+				handler.backupUc.RollbackSnapshot(false)
+				return
+			}
+		}
 	}
 
 	if ok := handler.backupUc.CommitSnapshot(backupMetadata, newSnapshot); !ok {
