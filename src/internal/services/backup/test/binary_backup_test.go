@@ -65,7 +65,7 @@ var expectedSchemas map[string]entities.Schema = map[string]entities.Schema{
 			{Name: "Table2_FK", Columns: []string{"Column3"}, ReferencedTable: "Table1", ReferencedColumns: []string{"Column1"}, UpdateAction: sql.NoAction, DeleteAction: sql.NoAction},
 		},
 		Indexes: []sql.SQLTableIndex{
-			{Name: "Table3_IDX", Type: "btree", Columns: []string{"Column1"}, Options: map[string]interface{}{"test1": 1}},
+			{Name: "Table3_IDX", Type: "btree", Columns: []string{"Column1"}, Options: map[string]interface{}{"test1": int64(1)}},
 		},
 	},
 	"Table3": &sql.SQLTable{
@@ -85,7 +85,7 @@ var expectedSchemas map[string]entities.Schema = map[string]entities.Schema{
 			{Name: "Table2_FK", Columns: []string{"Column3"}, ReferencedTable: "Table1", ReferencedColumns: []string{"Column1"}, UpdateAction: sql.NoAction, DeleteAction: sql.NoAction},
 		},
 		Indexes: []sql.SQLTableIndex{
-			{Name: "Table3_IDX", Type: "btree", Columns: []string{"Column1"}, Options: map[string]interface{}{"test1": 1}},
+			{Name: "Table3_IDX", Type: "btree", Columns: []string{"Column1"}, Options: map[string]interface{}{"test1": int64(1)}},
 		},
 	},
 }
@@ -94,40 +94,40 @@ var expectedRecordBatch map[string][]RecordBatchInfo = map[string][]RecordBatchI
 	"Table1": {
 		{batchName: "Batch1-1", chunks: []entities.SchemaRecordChunk{
 			&sql.SQLRecordChunk{Content: []sql.SQLRecord{
-				{Content: map[string]interface{}{"Column1": 1, "Column2": "test1"}},
-				{Content: map[string]interface{}{"Column1": 2, "Column2": "test2"}},
+				{Content: map[string]interface{}{"Column1": int64(1), "Column2": "test1"}},
+				{Content: map[string]interface{}{"Column1": int64(2), "Column2": "test2"}},
 			}},
 			&sql.SQLRecordChunk{Content: []sql.SQLRecord{
-				{Content: map[string]interface{}{"Column1": 3, "Column2": "test3"}},
-				{Content: map[string]interface{}{"Column1": 4, "Column2": "test4"}},
+				{Content: map[string]interface{}{"Column1": int64(3), "Column2": "test3"}},
+				{Content: map[string]interface{}{"Column1": int64(4), "Column2": "test4"}},
 			}},
 		}},
 		{batchName: "Batch1-2", chunks: []entities.SchemaRecordChunk{
 			&sql.SQLRecordChunk{Content: []sql.SQLRecord{
-				{Content: map[string]interface{}{"Column1": 5, "Column2": "test5"}},
-				{Content: map[string]interface{}{"Column1": 6, "Column2": "test6"}},
+				{Content: map[string]interface{}{"Column1": int64(5), "Column2": "test5"}},
+				{Content: map[string]interface{}{"Column1": int64(6), "Column2": "test6"}},
 			}},
 		}},
 	},
 	"Table2": {
 		{batchName: "Batch2-1", chunks: []entities.SchemaRecordChunk{
 			&sql.SQLRecordChunk{Content: []sql.SQLRecord{
-				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test1", "Column3": 1}},
-				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test3", "Column3": 3}},
-				{Content: map[string]interface{}{"Column1": time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test4", "Column3": 4}},
+				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test1", "Column3": int64(1)}},
+				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test3", "Column3": int64(3)}},
+				{Content: map[string]interface{}{"Column1": time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test4", "Column3": int64(4)}},
 			}},
 		}},
 	},
 	"Table3": {
 		{batchName: "Batch3-1", chunks: []entities.SchemaRecordChunk{
 			&sql.SQLRecordChunk{Content: []sql.SQLRecord{
-				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test2", "Column3": 2, "Column4": true}},
-				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test10", "Column3": 10, "Column4": false}},
+				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test2", "Column3": int64(2), "Column4": true}},
+				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test10", "Column3": int64(10), "Column4": false}},
 			}},
 			&sql.SQLRecordChunk{Content: []sql.SQLRecord{
-				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test3", "Column3": 3, "Column4": true}},
-				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test4", "Column3": 4, "Column4": true}},
-				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test11", "Column3": 11, "Column4": false}},
+				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test3", "Column3": int64(3), "Column4": true}},
+				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test4", "Column3": int64(4), "Column4": true}},
+				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test11", "Column3": int64(11), "Column4": false}},
 			}},
 		}},
 	},

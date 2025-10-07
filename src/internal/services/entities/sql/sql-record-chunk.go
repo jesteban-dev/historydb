@@ -128,7 +128,7 @@ func (chunk *SQLRecordChunk) EncodeToBytes() []byte {
 	encode.EncodeString(&auxBuf, &chunk.hash)
 	auxBuf.Write(encodedData)
 
-	encode.EncodeInt(&buf, pointers.Ptr(len(auxBuf.Bytes()))) // Saves buffer size so then we can extract the full buffer
+	encode.EncodeInt(&buf, pointers.Ptr(int64(len(auxBuf.Bytes())))) // Saves buffer size so then we can extract the full buffer
 	buf.Write(auxBuf.Bytes())
 
 	return buf.Bytes()
@@ -201,7 +201,7 @@ func (diff *SQLRecordChunkDiff) EncodeToBytes() []byte {
 	var buf bytes.Buffer
 	encodedData := diff.encodeData()
 
-	encode.EncodeInt(&buf, pointers.Ptr(len(encodedData))) // Saves buffer size so then we can extract the full buffer
+	encode.EncodeInt(&buf, pointers.Ptr(int64(len(encodedData)))) // Saves buffer size so then we can extract the full buffer
 	buf.Write(encodedData)
 
 	return buf.Bytes()

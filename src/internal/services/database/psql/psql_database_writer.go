@@ -186,12 +186,13 @@ func (writer *PSQLDatabaseWriter) SaveSchemaRecords(schema entities.Schema, chun
 		query += "("
 		for j, col := range table.Columns {
 			val := record.Content[col.Name]
-			if val == nil {
+			switch v := val.(type) {
+			case nil:
 				query += "NULL"
-			} else if psql.NonQuoteTypes[col.Type] {
-				query += val.(string)
-			} else {
-				query += fmt.Sprintf("'%s'", val)
+			case string:
+				query += fmt.Sprintf("'%s'", strings.ReplaceAll(v, "'", "''"))
+			default:
+				query += fmt.Sprintf("%v", v)
 			}
 
 			if j < len(table.Columns)-1 {
@@ -200,7 +201,7 @@ func (writer *PSQLDatabaseWriter) SaveSchemaRecords(schema entities.Schema, chun
 		}
 		query += ")"
 
-		if i < len(record.Content)-1 {
+		if i < len(recordChunk.Content)-1 {
 			query += ", "
 		}
 	}

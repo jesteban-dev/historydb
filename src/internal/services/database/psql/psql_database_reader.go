@@ -50,13 +50,13 @@ func (reader *PSQLDatabaseReader) ListSchemaDependencies() ([]entities.SchemaDep
 	sequences := []entities.SchemaDependency{}
 	for rows.Next() {
 		var sequence_schema, sequence_name, data_type string
-		var start_value, minimum_value, maximum_value, increment int
+		var start_value, minimum_value, maximum_value, increment int64
 		var cycle_option bool
 		if err := rows.Scan(&sequence_schema, &sequence_name, &data_type, &start_value, &minimum_value, &maximum_value, &increment, &cycle_option); err != nil {
 			return nil, err
 		}
 
-		var lastValue int
+		var lastValue int64
 		var isCalled bool
 		valueQuery := fmt.Sprintf("SELECT last_value, is_called FROM %s.%s", pq.QuoteIdentifier(sequence_schema), pq.QuoteIdentifier(sequence_name))
 		if err := reader.db.QueryRow(valueQuery).Scan(&lastValue, &isCalled); err != nil {
@@ -153,7 +153,7 @@ func (reader *PSQLDatabaseReader) GetSchemaRecordMetadata(schemaName string) (en
 	return metadata, nil
 }
 
-func (reader *PSQLDatabaseReader) GetSchemaRecordChunk(schema entities.Schema, chunkSize int, chunkCursor interface{}) (entities.SchemaRecordChunk, interface{}, error) {
+func (reader *PSQLDatabaseReader) GetSchemaRecordChunk(schema entities.Schema, chunkSize int64, chunkCursor interface{}) (entities.SchemaRecordChunk, interface{}, error) {
 	table := schema.(*sql_entities.SQLTable)
 	tableSchema, tableName := reader.parseDBObjectName(table.Name)
 
@@ -241,7 +241,7 @@ func (reader *PSQLDatabaseReader) GetSchemaRecordChunk(schema entities.Schema, c
 		results = append(results, sql_entities.SQLRecord{Content: row})
 	}
 
-	cursor.Offset += chunkSize
+	cursor.Offset += int(chunkSize)
 	cursor.LastPK = lastPKey
 	return &sql_entities.SQLRecordChunk{
 		Content: results,
@@ -276,7 +276,7 @@ func (dbReader *PSQLDatabaseReader) extractColumnsFromTable(tableSchema, tableNa
 		var columnName, dataType string
 		var columnDefault *string
 		var isNullable bool
-		var ordinalPosition int
+		var ordinalPosition int64
 		var characterMaximumLength, numericPrecision, numericScale *int
 		if err := rows.Scan(&columnName, &dataType, &isNullable, &columnDefault, &ordinalPosition, &characterMaximumLength, &numericPrecision, &numericScale); err != nil {
 			return nil, err

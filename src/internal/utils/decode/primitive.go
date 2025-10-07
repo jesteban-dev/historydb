@@ -24,12 +24,12 @@ func DecodeString(buf *bytes.Buffer) (*string, error) {
 	return &s, nil
 }
 
-func DecodeInt(buf *bytes.Buffer) (*int, error) {
+func DecodeInt(buf *bytes.Buffer) (*int64, error) {
 	var i int64
 	if err := binary.Read(buf, binary.LittleEndian, &i); err != nil {
 		return nil, err
 	}
-	return pointers.Ptr(int(i)), nil
+	return &i, nil
 }
 
 func DecodeBool(buf *bytes.Buffer) (*bool, error) {
@@ -43,6 +43,14 @@ func DecodeBool(buf *bytes.Buffer) (*bool, error) {
 	} else {
 		return pointers.Ptr(false), nil
 	}
+}
+
+func DecodeFloat(buf *bytes.Buffer) (*float64, error) {
+	var f float64
+	if err := binary.Read(buf, binary.LittleEndian, &f); err != nil {
+		return nil, err
+	}
+	return &f, nil
 }
 
 func DecodeTime(buf *bytes.Buffer) (*time.Time, error) {

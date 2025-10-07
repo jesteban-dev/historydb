@@ -1,6 +1,8 @@
 package handlers
 
-import "historydb/src/internal/usecases"
+import (
+	"historydb/src/internal/usecases"
+)
 
 type RestoreHanlder struct {
 	restoreUc usecases.RestoreUsecases
@@ -36,6 +38,11 @@ func (handler *RestoreHanlder) RestoreDatabase(snapshotId *string) {
 			handler.restoreUc.RollbackDatabaseRestore()
 			return
 		}
+	}
+
+	if ok := handler.restoreUc.RestoreSchemaRules(snapshot, schemas); !ok {
+		handler.restoreUc.RollbackDatabaseRestore()
+		return
 	}
 
 	if ok := handler.restoreUc.CommitDatabaseRestore(); !ok {

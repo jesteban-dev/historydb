@@ -12,7 +12,7 @@ type SQLTableColumn struct {
 	Type         string
 	IsNullable   bool
 	DefaultValue *string
-	Position     int
+	Position     int64
 }
 
 func (column SQLTableColumn) EncodeToBytes() []byte {

@@ -22,7 +22,7 @@ import (
 type PSQLTableContent struct {
 	DataLength int
 	MaxRowSize int
-	ChunkSize  int
+	ChunkSize  int64
 	Rows       []sql_entities.SQLRecord
 }
 
@@ -499,7 +499,7 @@ func testGetSchemaRecordChunk(t *testing.T, dbReader services.DatabaseReader, ex
 			if len(chunkRecord.Content) == 0 {
 				break
 			} else {
-				assert.LessOrEqual(t, len(chunkRecord.Content), test.ChunkSize)
+				assert.LessOrEqual(t, len(chunkRecord.Content), int(test.ChunkSize))
 
 				for k, v := range test.Rows[expectedRecordIndex].Content {
 					switch a := v.(type) {

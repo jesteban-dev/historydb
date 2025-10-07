@@ -125,8 +125,8 @@ func (snapshot *BackupSnapshot) DecodeFromBytes(data []byte) error {
 // ChunkSize -> The max-size for all chunks used to save the schema data.
 // Data -> A string of paths that represents all the batch files needed to rebuild the schema data.
 type BackupSnapshotSchemaData struct {
-	BatchSize int
-	ChunkSize int
+	BatchSize int64
+	ChunkSize int64
 	Data      []string
 }
 

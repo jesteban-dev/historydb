@@ -36,6 +36,8 @@ func DecodeMap(buf *bytes.Buffer) (map[string]interface{}, error) {
 		}
 
 		switch typ {
+		case 0x00:
+			m[*k] = nil
 		case 0x01:
 			str, err := DecodeString(mapBuf)
 			if err != nil {
@@ -54,6 +56,12 @@ func DecodeMap(buf *bytes.Buffer) (map[string]interface{}, error) {
 				return nil, err
 			}
 			m[*k] = *b
+		case 0x04:
+			f, err := DecodeFloat(mapBuf)
+			if err != nil {
+				return nil, err
+			}
+			m[*k] = *f
 		default:
 			panic("unsupported type")
 		}
