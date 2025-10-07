@@ -6,19 +6,27 @@ import (
 )
 
 type PSQLDatabaseFactory struct {
-	db *sql.DB
+	db       *sql.DB
+	dbReader *PSQLDatabaseReader
+	dbWriter *PSQLDatabaseWriter
 }
 
 func NewPSQLDatabaseFactory(db *sql.DB) *PSQLDatabaseFactory {
-	return &PSQLDatabaseFactory{db}
+	return &PSQLDatabaseFactory{db, nil, nil}
 }
 
 func (factory *PSQLDatabaseFactory) CreateReader() database_services.DatabaseReader {
-	return NewPSQLDatabaseReader(factory.db)
+	if factory.dbReader == nil {
+		factory.dbReader = NewPSQLDatabaseReader(factory.db)
+	}
+	return factory.dbReader
 }
 
 func (factory *PSQLDatabaseFactory) CreateWriter() database_services.DatabaseWriter {
-	return NewPSQLDatabaseWriter(factory.db)
+	if factory.dbWriter == nil {
+		factory.dbWriter = NewPSQLDatabaseWriter(factory.db)
+	}
+	return factory.dbWriter
 }
 
 func (factory *PSQLDatabaseFactory) GetDBEngine() string {

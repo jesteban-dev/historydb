@@ -3,19 +3,27 @@ package binary
 import backup_services "historydb/src/internal/services/backup"
 
 type BinaryBackupFactory struct {
-	backupPath string
+	backupPath   string
+	backupReader *BinaryBackupReader
+	backupWriter *BinaryBackupWriter
 }
 
 func NewBinaryBackupFactory(backupPath string) *BinaryBackupFactory {
-	return &BinaryBackupFactory{backupPath}
+	return &BinaryBackupFactory{backupPath, nil, nil}
 }
 
 func (factory *BinaryBackupFactory) CreateReader() backup_services.BackupReader {
-	return NewBinaryBackupReader(factory.backupPath)
+	if factory.backupReader == nil {
+		factory.backupReader = NewBinaryBackupReader(factory.backupPath)
+	}
+	return factory.backupReader
 }
 
 func (factory *BinaryBackupFactory) CreateWriter() backup_services.BackupWriter {
-	return NewBinaryBackupWriter(factory.backupPath)
+	if factory.backupWriter == nil {
+		factory.backupWriter = NewBinaryBackupWriter(factory.backupPath)
+	}
+	return factory.backupWriter
 }
 
 func (factory *BinaryBackupFactory) GetBackupEncoding() string {

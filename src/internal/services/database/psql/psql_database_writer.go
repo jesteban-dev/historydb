@@ -163,6 +163,53 @@ func (writer *PSQLDatabaseWriter) SaveSchemaRules(schema entities.Schema) error 
 	return nil
 }
 
+func (writer *PSQLDatabaseWriter) SaveSchemaRecords(schema entities.Schema, chunk entities.SchemaRecordChunk) error {
+	if writer.tx == nil {
+		return services.ErrDatabaseTransactionNotFound
+	}
+
+	table := schema.(*sql_entities.SQLTable)
+	tableSchema, tableName := writer.parseDBObjectName(table.Name)
+
+	recordChunk := chunk.(*sql_entities.SQLRecordChunk)
+
+	query := fmt.Sprintf("INSERT INTO %s.%s (", pq.QuoteIdentifier(tableSchema), pq.QuoteIdentifier(tableName))
+	for i, col := range table.Columns {
+		query += col.Name
+		if i < len(table.Columns)-1 {
+			query += ", "
+		}
+	}
+	query += ") VALUES "
+
+	for i, record := range recordChunk.Content {
+		query += "("
+		for j, col := range table.Columns {
+			val := record.Content[col.Name]
+			if val == nil {
+				query += "NULL"
+			} else if psql.NonQuoteTypes[col.Type] {
+				query += val.(string)
+			} else {
+				query += fmt.Sprintf("'%s'", val)
+			}
+
+			if j < len(table.Columns)-1 {
+				query += ", "
+			}
+		}
+		query += ")"
+
+		if i < len(record.Content)-1 {
+			query += ", "
+		}
+	}
+	query += ";"
+
+	_, err := writer.tx.Exec(query)
+	return err
+}
+
 func (writer *PSQLDatabaseWriter) parseDBObjectName(objectName string) (string, string) {
 	parts := strings.Split(objectName, ".")
 	if len(parts) == 2 {

@@ -150,7 +150,7 @@ func (uc *RestoreUsecasesImpl) RestoreSchemaDependencies(snapshot *entities.Back
 	return true
 }
 
-func (uc *RestoreUsecasesImpl) RestoreSchemas(snapshot *entities.BackupSnapshot) bool {
+func (uc *RestoreUsecasesImpl) RestoreSchemas(snapshot *entities.BackupSnapshot) []entities.Schema {
 	backupReader := uc.backupFactory.CreateReader()
 	dbWriter := uc.dbFactory.CreateWriter()
 
@@ -164,12 +164,12 @@ func (uc *RestoreUsecasesImpl) RestoreSchemas(snapshot *entities.BackupSnapshot)
 			}
 
 			uc.logger.Errorf("could not read %s schema from backup: %v\n", schemaName, err)
-			return false
+			return nil
 		}
 
 		if err := dbWriter.SaveSchema(schema); err != nil {
 			uc.logger.Errorf("could not restore %s schema: %v\n", schemaName, err)
-			return false
+			return nil
 		}
 
 		schemas = append(schemas, schema)
@@ -181,10 +181,52 @@ func (uc *RestoreUsecasesImpl) RestoreSchemas(snapshot *entities.BackupSnapshot)
 	for _, schema := range schemas {
 		if err := dbWriter.SaveSchemaRules(schema); err != nil {
 			uc.logger.Errorf("could not restore %s schema rules: %v\n", schema.GetName(), err)
-			return false
+			return nil
 		}
 	}
 
 	fmt.Println("  - All schema rules restored successfully")
+	return schemas
+}
+
+func (uc *RestoreUsecasesImpl) RestoreSchemaRecords(snapshot *entities.BackupSnapshot, schema entities.Schema) bool {
+	backupReader := uc.backupFactory.CreateReader()
+	dbWriter := uc.dbFactory.CreateWriter()
+
+	backupMetadata, ok := snapshot.Data[schema.GetName()]
+	if !ok {
+		uc.logger.Errorf("%s schema is not present in backup records\n", schema.GetName())
+		return false
+	}
+
+	batchProgress := progressbar.NewOptions(len(backupMetadata.Data), progressbar.OptionSetDescription(fmt.Sprintf("  + Restoring all %d batches for %s schema...", len(backupMetadata.Data), schema.GetName())), progressbar.OptionSetWidth(30), progressbar.OptionSetWriter(os.Stdout), progressbar.OptionSetRenderBlankState(true))
+	// Loops over every schema batch
+	for _, batch := range backupMetadata.Data {
+		// Retrieves chunk references in the batch
+		chunkRefs, err := backupReader.GetSchemaRecordChunkRefsInBatch(batch)
+		if err != nil {
+			uc.logger.Errorf("could not retrieve chunk refs from %s schema: %v\n", schema.GetName(), err)
+			return false
+		}
+
+		// Loops over every chunk reference in the batch
+		for _, chunkRef := range chunkRefs {
+			// Retrieves the chunk from the reference
+			chunk, _, err := backupReader.GetSchemaRecordChunk(batch, chunkRef)
+			if err != nil {
+				uc.logger.Errorf("could not retrieve chunk from %s schema: %v\n", schema.GetName(), err)
+				return false
+			}
+
+			// Saves the chunk into DB
+			if err := dbWriter.SaveSchemaRecords(schema, chunk); err != nil {
+				uc.logger.Errorf("could not save records in DB %s schema: %v\n", schema.GetName(), err)
+				return false
+			}
+		}
+		batchProgress.Add(1)
+	}
+
+	fmt.Println("  - All batches restored successfully")
 	return true
 }

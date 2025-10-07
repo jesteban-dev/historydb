@@ -9,5 +9,6 @@ type RestoreUsecases interface {
 	RollbackDatabaseRestore()
 
 	RestoreSchemaDependencies(snapshot *entities.BackupSnapshot) bool
-	RestoreSchemas(snapshot *entities.BackupSnapshot) bool
+	RestoreSchemas(snapshot *entities.BackupSnapshot) []entities.Schema
+	RestoreSchemaRecords(snapshot *entities.BackupSnapshot, schema entities.Schema) bool
 }
