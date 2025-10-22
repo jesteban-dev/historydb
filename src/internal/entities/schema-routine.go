@@ -11,6 +11,7 @@ const (
 type Routine interface {
 	GetName() string
 	GetRoutineType() RoutineType
+	GetDependencies() []string
 	Hash() string
 	Diff(routine Routine, isDiff bool) RoutineDiff
 	ApplyDiff(diff RoutineDiff) Routine

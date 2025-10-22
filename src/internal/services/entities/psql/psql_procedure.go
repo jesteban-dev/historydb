@@ -32,6 +32,10 @@ func (procedure *PSQLProcedure) GetRoutineType() entities.RoutineType {
 	return entities.PSQLProcedure
 }
 
+func (procedure *PSQLProcedure) GetDependencies() []string {
+	return procedure.Dependencies
+}
+
 func (procedure *PSQLProcedure) Hash() string {
 	hash := sha256.Sum256(procedure.encodeData())
 	return hex.EncodeToString(hash[:])

@@ -34,6 +34,10 @@ func (function *PSQLFunction) GetRoutineType() entities.RoutineType {
 	return entities.PSQLFunction
 }
 
+func (function *PSQLFunction) GetDependencies() []string {
+	return function.Dependencies
+}
+
 func (function *PSQLFunction) Hash() string {
 	hash := sha256.Sum256(function.encodeData())
 	return hex.EncodeToString(hash[:])

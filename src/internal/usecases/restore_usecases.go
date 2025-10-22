@@ -12,4 +12,5 @@ type RestoreUsecases interface {
 	RestoreSchemas(snapshot *entities.BackupSnapshot) []entities.Schema
 	RestoreSchemaRules(snapshot *entities.BackupSnapshot, schemas []entities.Schema) bool
 	RestoreSchemaRecords(snapshot *entities.BackupSnapshot, schema entities.Schema) bool
+	RestoreRoutines(snapshot *entities.BackupSnapshot) bool
 }
