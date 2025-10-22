@@ -8,16 +8,14 @@ import (
 	"historydb/src/internal/entities"
 	"historydb/src/internal/utils/decode"
 	"historydb/src/internal/utils/encode"
+	"historydb/src/internal/utils/pointers"
 	"historydb/src/internal/utils/types"
 )
 
-const (
-	CURRENT_VERSION string = "1"
-)
+var SQLTABLE_VERSION int64 = 1
 
 type SQLTable struct {
-	SchemaType  entities.SchemaType
-	Version     string
+	Version     int64
 	Name        string
 	Columns     []SQLTableColumn
 	Constraints []SQLTableConstraint
@@ -26,7 +24,7 @@ type SQLTable struct {
 }
 
 func (table *SQLTable) GetSchemaType() entities.SchemaType {
-	return table.SchemaType
+	return entities.SQLTable
 }
 
 func (table *SQLTable) GetName() string {
@@ -87,11 +85,10 @@ func (table *SQLTable) EncodeToBytes() []byte {
 func (table *SQLTable) DecodeFromBytes(data []byte) error {
 	buf := bytes.NewBuffer(data)
 
-	schemaType, err := decode.DecodeString(buf)
-	if err != nil {
+	if _, err := decode.DecodeString(buf); err != nil {
 		return err
 	}
-	version, err := decode.DecodeString(buf)
+	version, err := decode.DecodeInt(buf)
 	if err != nil {
 		return err
 	}
@@ -152,7 +149,6 @@ func (table *SQLTable) DecodeFromBytes(data []byte) error {
 		}
 	}
 
-	table.SchemaType = entities.SchemaType(*schemaType)
 	table.Version = *version
 	table.Name = *name
 	table.Columns = columnSlice
@@ -165,8 +161,8 @@ func (table *SQLTable) DecodeFromBytes(data []byte) error {
 func (table *SQLTable) encodeData() []byte {
 	var buf bytes.Buffer
 
-	encode.EncodeString(&buf, (*string)(&table.SchemaType))
-	encode.EncodeString(&buf, &table.Version)
+	encode.EncodeString(&buf, (*string)(pointers.Ptr(entities.SQLTable)))
+	encode.EncodeInt(&buf, &SQLTABLE_VERSION)
 	buf.WriteByte(table.getByteFlags())
 	encode.EncodeString(&buf, &table.Name)
 	encode.EncodeSlice(&buf, table.Columns)

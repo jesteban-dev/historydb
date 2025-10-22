@@ -12,5 +12,6 @@ var (
 	ErrDatabaseTransactionNotFound = errors.New("no db transaction in progress")
 	ErrDependencyNotSupported      = errors.New("unsupported schema dependency type")
 	ErrRecordNotSupported          = errors.New("unsupported schema record type")
+	ErrRoutineNotSupported         = errors.New("unsupported routine type")
 	ErrSchemaNotSupported          = errors.New("unsupported schema type")
 )

@@ -8,6 +8,7 @@ import (
 	sql_entities "historydb/src/internal/services/entities/sql"
 	"historydb/src/internal/services/utils"
 	"historydb/src/internal/utils/types"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -64,17 +65,15 @@ func (reader *PSQLDatabaseReader) ListSchemaDependencies() ([]entities.SchemaDep
 		}
 
 		sequences = append(sequences, &psql.PSQLSequence{
-			DependencyType: entities.PSQLSequence,
-			Version:        psql.CURRENT_VERSION,
-			Name:           fmt.Sprintf("%s.%s", sequence_schema, sequence_name),
-			Type:           data_type,
-			Start:          start_value,
-			Min:            minimum_value,
-			Max:            maximum_value,
-			Increment:      increment,
-			IsCycle:        cycle_option,
-			LastValue:      lastValue,
-			IsCalled:       isCalled,
+			Name:      fmt.Sprintf("%s.%s", sequence_schema, sequence_name),
+			Type:      data_type,
+			Start:     start_value,
+			Min:       minimum_value,
+			Max:       maximum_value,
+			Increment: increment,
+			IsCycle:   cycle_option,
+			LastValue: lastValue,
+			IsCalled:  isCalled,
 		})
 	}
 
@@ -127,7 +126,6 @@ func (reader *PSQLDatabaseReader) GetSchemaDefinition(schemaName string) (entiti
 	}
 
 	return &sql_entities.SQLTable{
-		SchemaType:  entities.SQLTable,
 		Name:        schemaName,
 		Columns:     columns,
 		Constraints: constraints,
@@ -246,6 +244,114 @@ func (reader *PSQLDatabaseReader) GetSchemaRecordChunk(schema entities.Schema, c
 	return &sql_entities.SQLRecordChunk{
 		Content: results,
 	}, cursor, nil
+}
+
+func (reader *PSQLDatabaseReader) ListRoutines() ([]entities.Routine, error) {
+	routines := []entities.Routine{}
+
+	dependencies := make(map[string][]string)
+	dependRows, err := reader.db.Query(`
+		SELECT n1.nspname AS dependent_schema, p1.proname AS dependent_name, n2.nspname AS referenced_schema, p2.proname AS referenced_name
+		FROM pg_depend d
+			JOIN pg_proc p1 ON p1.oid = d.objid
+			JOIN pg_namespace n1 ON n1.oid = p1.pronamespace
+			JOIN pg_proc p2 ON p2.oid = d.refobjid
+			JOIN pg_namespace n2 ON n2.oid = p2.pronamespace
+		WHERE d.classid = 'pg_proc'::regclass AND d.refclassid = 'pg_proc'::regclass AND d.deptype = 'n' AND n1.nspname NOT IN ('pg_catalog', 'information_schema') AND n2.nspname NOT IN ('pg_catalog', 'information_schama')
+		ORDER BY dependent_name
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer dependRows.Close()
+
+	for dependRows.Next() {
+		var dependentSchema, dependentName, referencedSchema, referencedName string
+		if err := dependRows.Scan(&dependentSchema, &dependentName, &referencedSchema, &referencedName); err != nil {
+			return nil, err
+		}
+
+		key := fmt.Sprintf("%s.%s", dependentSchema, dependentName)
+		if _, ok := dependencies[key]; !ok {
+			dependencies[key] = []string{fmt.Sprintf("%s.%s", referencedSchema, referencedName)}
+		} else {
+			dependencies[key] = append(dependencies[key], fmt.Sprintf("%s.%s", referencedSchema, referencedName))
+		}
+	}
+
+	routineRows, err := reader.db.Query(`
+		SELECT n.nspname AS schema, p.proname AS name, p.prokind AS type, l.lanname as language, CASE p.provolatile WHEN 'i' THEN 'IMMUTABLE' WHEN 's' THEN 'STABLE' ELSE NULL END AS volatility, NULLIF(pg_get_function_arguments(p.oid), '') AS parameters, CASE WHEN p.prokind = 'f' THEN pg_get_function_result(p.oid) ELSE NULL END AS return_type, REGEXP_REPLACE(pg_get_functiondef(p.oid), '^.*AS (\$[^$]*\$).*$', '\1', 's') AS tag, REGEXP_REPLACE(pg_get_functiondef(p.oid), '^.*AS (\$[^$]*\$)\s*(.*?)\1.*$', '\2', 'gs') AS definition
+		FROM pg_proc p
+			JOIN pg_namespace n ON n.oid = p.pronamespace
+			JOIN pg_language l ON l.oid = p.prolang
+		WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') AND p.prokind IN ('f', 'p')
+		ORDER BY p.proname
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer routineRows.Close()
+
+	for routineRows.Next() {
+		var functionSchema, functionName, functionType, language, returnType, tag, definition string
+		var volatility, parameters *string
+		if err := routineRows.Scan(&functionSchema, &functionName, &functionType, &language, &volatility, &parameters, &returnType, &tag, &definition); err != nil {
+			return nil, err
+		}
+
+		if functionType == "f" {
+			function := psql.PSQLFunction{
+				Name:         fmt.Sprintf("%s.%s", functionSchema, functionName),
+				Language:     language,
+				Volatility:   volatility,
+				Dependencies: dependencies[fmt.Sprintf("%s.%s", functionSchema, functionName)],
+				Parameters:   parameters,
+				ReturnType:   returnType,
+				Tag:          tag,
+				Definition:   normalizeRoutineDefinition(definition),
+			}
+
+			routines = append(routines, &function)
+		} else {
+			procedure := psql.PSQLProcedure{
+				Name:         fmt.Sprintf("%s.%s", functionSchema, functionName),
+				Language:     language,
+				Dependencies: dependencies[fmt.Sprintf("%s.%s", functionSchema, functionName)],
+				Parameters:   parameters,
+				Tag:          tag,
+				Definition:   definition,
+			}
+
+			routines = append(routines, &procedure)
+		}
+	}
+
+	triggerRows, err := reader.db.Query(`
+		SELECT t.tgname AS trigger_name, REGEXP_REPLACE(pg_get_triggerdef(t.oid, true), '^CREATE TRIGGER\s+' || t.tgname || '\s+', '', 'i') AS definition
+		FROM pg_trigger t
+			JOIN pg_class c ON c.oid = t.tgrelid
+			JOIN pg_namespace n ON n.oid = c.relnamespace
+		WHERE NOT t.tgisinternal AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+		ORDER BY n.nspname, c.relname, t.tgname
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer triggerRows.Close()
+
+	for triggerRows.Next() {
+		var triggerName, definition string
+		if err := triggerRows.Scan(&triggerName, &definition); err != nil {
+			return nil, err
+		}
+
+		routines = append(routines, &psql.PSQLTrigger{
+			Name:       triggerName,
+			Definition: normalizeRoutineDefinition(definition),
+		})
+	}
+
+	return routines, nil
 }
 
 // As PSQL has schemes and our Schema names for this language is composed as <scheme-name>.<table-name>,
@@ -454,4 +560,25 @@ func (dbReader *PSQLDatabaseReader) extractIndexesFromTable(tableSchema, tableNa
 	}
 
 	return indexes, nil
+}
+
+// This function normalizes the routine definition strings
+func normalizeRoutineDefinition(definition string) string {
+	s := strings.TrimSpace(definition)
+
+	reSpace := regexp.MustCompile(`\s+`)
+	s = reSpace.ReplaceAllString(s, " ")
+
+	reComma := regexp.MustCompile(`\s*,\s*`)
+	s = reComma.ReplaceAllString(s, ", ")
+
+	reParenOpen := regexp.MustCompile(`\(\s+`)
+	s = reParenOpen.ReplaceAllString(s, "(")
+
+	reParenClose := regexp.MustCompile(`\s+\)`)
+	s = reParenClose.ReplaceAllString(s, ")")
+
+	reSemicolon := regexp.MustCompile(`\s+;`)
+	s = reSemicolon.ReplaceAllString(s, ";")
+	return s
 }

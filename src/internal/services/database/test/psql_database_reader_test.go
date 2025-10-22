@@ -32,6 +32,7 @@ type PSQLTestContent struct {
 	Sequences    []psql_entities.PSQLSequence
 	Tables       []sql_entities.SQLTable
 	TableContent map[string]PSQLTableContent
+	Routines     []entities.Routine
 }
 
 var imageData = map[string]PSQLTestContent{
@@ -167,10 +168,10 @@ var imageData = map[string]PSQLTestContent{
 		DBName:  "dellstore",
 		IsEmpty: false,
 		Sequences: []psql_entities.PSQLSequence{
-			{DependencyType: entities.PSQLSequence, Version: psql_entities.CURRENT_VERSION, Name: "public.categories_category_seq", Type: "integer", Start: 1, Min: 1, Max: 2147483647, Increment: 1, IsCycle: false, LastValue: 16, IsCalled: true},
-			{DependencyType: entities.PSQLSequence, Version: psql_entities.CURRENT_VERSION, Name: "public.customers_customerid_seq", Type: "integer", Start: 1, Min: 1, Max: 2147483647, Increment: 1, IsCycle: false, LastValue: 20000, IsCalled: true},
-			{DependencyType: entities.PSQLSequence, Version: psql_entities.CURRENT_VERSION, Name: "public.orders_orderid_seq", Type: "integer", Start: 1, Min: 1, Max: 2147483647, Increment: 1, IsCycle: false, LastValue: 12000, IsCalled: true},
-			{DependencyType: entities.PSQLSequence, Version: psql_entities.CURRENT_VERSION, Name: "public.products_prod_id_seq", Type: "integer", Start: 1, Min: 1, Max: 2147483647, Increment: 1, IsCycle: false, LastValue: 10000, IsCalled: true},
+			{Name: "public.categories_category_seq", Type: "integer", Start: 1, Min: 1, Max: 2147483647, Increment: 1, IsCycle: false, LastValue: 16, IsCalled: true},
+			{Name: "public.customers_customerid_seq", Type: "integer", Start: 1, Min: 1, Max: 2147483647, Increment: 1, IsCycle: false, LastValue: 20000, IsCalled: true},
+			{Name: "public.orders_orderid_seq", Type: "integer", Start: 1, Min: 1, Max: 2147483647, Increment: 1, IsCycle: false, LastValue: 12000, IsCalled: true},
+			{Name: "public.products_prod_id_seq", Type: "integer", Start: 1, Min: 1, Max: 2147483647, Increment: 1, IsCycle: false, LastValue: 10000, IsCalled: true},
 		},
 		Tables: []sql_entities.SQLTable{
 			{
@@ -368,6 +369,9 @@ var imageData = map[string]PSQLTestContent{
 			}},
 			"public.reorder": {ChunkSize: 1},
 		},
+		Routines: []entities.Routine{
+			&psql_entities.PSQLFunction{Name: "public.new_customer", Language: "plpgsql", Parameters: pointers.Ptr("firstname_in character varying, lastname_in character varying, address1_in character varying, address2_in character varying, city_in character varying, state_in character varying, zip_in integer, country_in character varying, region_in integer, email_in character varying, phone_in character varying, creditcardtype_in integer, creditcard_in character varying, creditcardexpiration_in character varying, username_in character varying, password_in character varying, age_in integer, income_in integer, gender_in character varying, OUT customerid_out integer"), ReturnType: "integer", Tag: "$function$", Definition: "DECLARE rows_returned INT; BEGIN SELECT COUNT(*) INTO rows_returned FROM CUSTOMERS WHERE USERNAME = username_in; IF rows_returned = 0 THEN INSERT INTO CUSTOMERS (FIRSTNAME, LASTNAME, EMAIL, PHONE, USERNAME, PASSWORD, ADDRESS1, ADDRESS2, CITY, STATE, ZIP, COUNTRY, REGION, CREDITCARDTYPE, CREDITCARD, CREDITCARDEXPIRATION, AGE, INCOME, GENDER) VALUES (firstname_in, lastname_in, email_in, phone_in, username_in, password_in, address1_in, address2_in, city_in, state_in, zip_in, country_in, region_in, creditcardtype_in, creditcard_in, creditcardexpiration_in, age_in, income_in, gender_in); select currval(pg_get_serial_sequence('customers', 'customerid')) into customerid_out; ELSE customerid_out := 0; END IF; END"},
+		},
 	},
 }
 
@@ -382,6 +386,7 @@ func TestPSQLReader(t *testing.T) {
 		testGetSchemaDefinition(t, dbReader, data.Tables)
 		testGetSchemaRecordMetadata(t, dbReader, data.TableContent)
 		testGetSchemaRecordChunk(t, dbReader, data.TableContent)
+		testListRoutines(t, dbReader, data.Routines)
 
 		cleanup()
 	}
@@ -528,5 +533,15 @@ func testGetSchemaRecordChunk(t *testing.T, dbReader services.DatabaseReader, ex
 
 			cursor = nextCursor
 		}
+	}
+}
+
+func testListRoutines(t *testing.T, dbReader services.DatabaseReader, expectedRoutines []entities.Routine) {
+	routines, err := dbReader.ListRoutines()
+	assert.Nil(t, err)
+	assert.Equal(t, len(expectedRoutines), len(routines))
+
+	for i, routine := range routines {
+		assert.Equal(t, expectedRoutines[i], routine)
 	}
 }

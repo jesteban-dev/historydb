@@ -211,6 +211,36 @@ func (writer *PSQLDatabaseWriter) SaveSchemaRecords(schema entities.Schema, chun
 	return err
 }
 
+func (writer *PSQLDatabaseWriter) SaveRoutine(routine entities.Routine) error {
+	if writer.tx == nil {
+		return services.ErrDatabaseTransactionNotFound
+	}
+
+	var query string
+	if routine.GetRoutineType() == entities.PSQLFunction {
+		function := routine.(*psql.PSQLFunction)
+
+		query = fmt.Sprintf("CREATE FUNCTION %s(%s) RETURNS %s LANGUAGE %s AS %s %s %s", function.Name, function.Parameters, function.ReturnType, function.Language, function.Tag, function.Definition, function.Tag)
+
+		if function.Volatility != nil {
+			query += fmt.Sprintf(" %s", *function.Volatility)
+		}
+	} else if routine.GetRoutineType() == entities.PSQLProcedure {
+		procedure := routine.(*psql.PSQLProcedure)
+
+		query = fmt.Sprintf("CREATE PROCEDURE %s(%s) LANGUAGE %s AS %s %s %s", procedure.Name, procedure.Parameters, procedure.Language, procedure.Tag, procedure.Definition, procedure.Tag)
+	} else if routine.GetRoutineType() == entities.PSQLTrigger {
+		trigger := routine.(*psql.PSQLTrigger)
+
+		query = fmt.Sprintf("CREATE TRIGGER %s %s", trigger.Name, trigger.Definition)
+	} else {
+		return services.ErrBackupCorruptedFile
+	}
+
+	_, err := writer.tx.Exec(query)
+	return err
+}
+
 func (writer *PSQLDatabaseWriter) parseDBObjectName(objectName string) (string, string) {
 	parts := strings.Split(objectName, ".")
 	if len(parts) == 2 {

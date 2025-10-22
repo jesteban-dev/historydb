@@ -10,6 +10,7 @@ import "historydb/src/internal/entities"
 // GetSchemaDefinition() -> Retrieves the schema definition from a DB given its name. (Tables, etc...)
 // GetSchemaRecordMetadata() -> Retrieves the metadata needed to get the records in a single schema. (record size, total records)
 // GetSchemaRecordChunk() -> Retrieves a chunk of records from the given schema and use a cursor to iterate over it.
+// ListRotines() -> Retrieves a list of db routines from the DB. (Functions, procedures, triggers...)
 type DatabaseReader interface {
 	CheckDBIsEmpty() (bool, error)
 
@@ -18,4 +19,5 @@ type DatabaseReader interface {
 	GetSchemaDefinition(schemaName string) (entities.Schema, error)
 	GetSchemaRecordMetadata(schemaName string) (entities.SchemaRecordMetadata, error)
 	GetSchemaRecordChunk(schema entities.Schema, chunkSize int64, chunkCursor interface{}) (entities.SchemaRecordChunk, interface{}, error)
+	ListRoutines() ([]entities.Routine, error)
 }

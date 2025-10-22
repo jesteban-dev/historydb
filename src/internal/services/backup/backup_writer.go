@@ -9,8 +9,15 @@ import "historydb/src/internal/entities"
 // BeginSnapshot() -> Begins a transaction for saving all the new snapshot content.
 // CommitSnapshot() -> Commits the previous transaction.
 // RollbackSnapshot() -> Rollbacks the previous transaction.
-// SaveSchemaDependency() -> Saves a schema dependency into the transaction previous created.
-// SaveSchemaDependencyDiff() -> Saves a schema dependency reduces version with its updates from the last state.
+// SaveSchemaDependency() -> Saves a schema dependency into the transaction previously created.
+// SaveSchemaDependencyDiff() -> Saves a schema dependency reduced version with its updates from the last state.
+// SaveSchema() -> Saves a schema definition into the transaction previously created.
+// SaveSchemaDiff() -> Saves a schema definition reduced version with its updates from the last state.
+// SaveSchemaRecordChunk() -> Saves a schema record chunk into the transaction previously created.
+// SaveSchemaRecordChunkDiff() -> Saves a schema record chunk reduced version with its updates from the last state.
+// SaveSchemaRecordBatch() -> Saves a complete schema record batch with all its chunks.
+// SaveRoutine() -> Saves a database routine into the transaction previously created.
+// SaveSchemaRoutineDiff() -> Saves a database routine reduced version with its updates from the last state.
 type BackupWriter interface {
 	CreateBackupStructure() error
 	DeleteBackupStructure() error
@@ -28,4 +35,7 @@ type BackupWriter interface {
 	SaveSchemaRecordChunk(batchRef string, chunk entities.SchemaRecordChunk) error
 	SaveSchemaRecordChunkDiff(prevBatchRef, batchRef string, chunk entities.SchemaRecordChunkDiff) error
 	SaveSchemaRecordBatch(batchTempRef, batchRef string) error
+
+	SaveRoutine(routine entities.Routine) error
+	SaveRoutineDiff(diff entities.RoutineDiff) error
 }
