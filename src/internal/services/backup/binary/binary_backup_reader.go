@@ -25,6 +25,11 @@ func NewBinaryBackupReader(backupPath string) *BinaryBackupReader {
 	return &BinaryBackupReader{backupPath}
 }
 
+func (reader *BinaryBackupReader) CheckBackupExists() bool {
+	_, err := os.Stat(filepath.Join(reader.backupPath, "metadata.hdb"))
+	return err == nil
+}
+
 func (reader *BinaryBackupReader) GetBackupMetadata() (entities.BackupMetadata, error) {
 	pathToFile := filepath.Join(reader.backupPath, "metadata.hdb")
 	data, err := os.ReadFile(pathToFile)

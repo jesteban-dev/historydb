@@ -9,12 +9,14 @@ import (
 	"time"
 )
 
-// BackupSnapshot defines the main info for all the snapshots taken in the backup
+// BackupSnapshot defines a struct which contains all the data relative to a backup snapshot
 //
-// Id -> Snaphost Id
-// Timestamp -> Timestamp the snapshot was taken
-// Schemas -> map that links every schema with its schema backup file
-// Data -> map that link every schema with its schema backup data files
+// Timestamp -> The timestamp when the snapshot was taken
+// SnapshotId -> The snapshot identificator
+// SchemaDependencies -> Map that links every schema dependency with its dependencies backup files
+// Schemas -> Map that links every schema with its schema backup files
+// Data -> Map that links every scheam with its data files
+// Routines -> Map that links every routine with its backup files
 type BackupSnapshot struct {
 	Timestamp          time.Time
 	SnapshotId         string
@@ -49,6 +51,9 @@ func (snapshot *BackupSnapshot) encodeData() []byte {
 	if len(snapshot.Data) > 0 {
 		flags |= 1 << 2
 	}
+	if len(snapshot.Routines) > 0 {
+		flags |= 1 << 3
+	}
 
 	buf.WriteByte(flags)
 	encode.EncodeTime(&buf, &snapshot.Timestamp)
@@ -56,6 +61,7 @@ func (snapshot *BackupSnapshot) encodeData() []byte {
 	encode.EncodeMap(&buf, types.ToInterfaceMap(snapshot.SchemaDependencies))
 	encode.EncodeMap(&buf, types.ToInterfaceMap(snapshot.Schemas))
 	encode.EncodeStructMap(&buf, snapshot.Data)
+	encode.EncodeMap(&buf, types.ToInterfaceMap(snapshot.Routines))
 
 	return buf.Bytes()
 }
@@ -110,12 +116,25 @@ func (snapshot *BackupSnapshot) DecodeFromBytes(data []byte) error {
 			dataMap[k] = *v
 		}
 	}
+	var routinesMap map[string]string
+	if flags&(1<<3) != 0 {
+		routines, err := decode.DecodeMap(buf)
+		if err != nil {
+			return err
+		}
+
+		routinesMap, err = types.FromInterfaceMap[string](routines)
+		if err != nil {
+			return err
+		}
+	}
 
 	snapshot.Timestamp = *timestamp
 	snapshot.SnapshotId = *snapshotId
 	snapshot.SchemaDependencies = schemaDependenciesMap
 	snapshot.Schemas = schemasMap
 	snapshot.Data = dataMap
+	snapshot.Routines = routinesMap
 	return nil
 }
 
@@ -134,6 +153,12 @@ type BackupSnapshotSchemaData struct {
 func (schemaData BackupSnapshotSchemaData) EncodeToBytes() []byte {
 	var buf bytes.Buffer
 
+	var flags byte
+	if len(schemaData.Data) > 0 {
+		flags |= 1 << 0
+	}
+
+	buf.WriteByte(flags)
 	encode.EncodeInt(&buf, &schemaData.BatchSize)
 	encode.EncodeInt(&buf, &schemaData.ChunkSize)
 	encode.EncodePrimitiveSlice(&buf, schemaData.Data)
@@ -144,6 +169,10 @@ func (schemaData BackupSnapshotSchemaData) EncodeToBytes() []byte {
 func (schemaData *BackupSnapshotSchemaData) DecodeFromBytes(data []byte) (*BackupSnapshotSchemaData, error) {
 	buf := bytes.NewBuffer(data)
 
+	flags, err := buf.ReadByte()
+	if err != nil {
+		return nil, err
+	}
 	batchSize, err := decode.DecodeInt(buf)
 	if err != nil {
 		return nil, err
@@ -152,9 +181,12 @@ func (schemaData *BackupSnapshotSchemaData) DecodeFromBytes(data []byte) (*Backu
 	if err != nil {
 		return nil, err
 	}
-	dataSlice, err := decode.DecodePrimitiveSlice[string](buf)
-	if err != nil {
-		return nil, err
+	var dataSlice []string
+	if flags&(1<<0) != 0 {
+		dataSlice, err = decode.DecodePrimitiveSlice[string](buf)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &BackupSnapshotSchemaData{

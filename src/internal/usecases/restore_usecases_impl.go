@@ -31,7 +31,7 @@ func (uc *RestoreUsecasesImpl) GetBackupSnapshot(snapshotId *string) *entities.B
 
 	// Checking if DB is empty to dump all the backup content
 	if isEmpty, err := dbReader.CheckDBIsEmpty(); err != nil {
-		uc.logger.Errorf("could not check if database is empty: %v\n", err)
+		uc.logger.Errorf("could not check if database is empty: %v", err)
 		return nil
 	} else if !isEmpty {
 		fmt.Println("To restore the database it is required an empty database")
@@ -39,10 +39,15 @@ func (uc *RestoreUsecasesImpl) GetBackupSnapshot(snapshotId *string) *entities.B
 	}
 
 	// Reads metadata backup and checks engines
+	if ok := backupReader.CheckBackupExists(); !ok {
+		fmt.Println("The specified path does not seem to contain a backup")
+		return nil
+	}
+
 	backupMetadata, err := backupReader.GetBackupMetadata()
 	if err != nil {
 		fmt.Println("The specified path does not seem to contain a backup")
-		uc.logger.Errorf("could not retrieve backup: %v\n", err)
+		uc.logger.Errorf("could not retrieve backup: %v", err)
 		return nil
 	}
 
@@ -60,7 +65,7 @@ func (uc *RestoreUsecasesImpl) GetBackupSnapshot(snapshotId *string) *entities.B
 				if item.SnapshotId == *snapshotId {
 					snapshot, err = backupReader.GetBackupSnapshot(item.SnapshotId)
 					if err != nil {
-						uc.logger.Errorf("could not retrieve snapshot from backup: %v\n", err)
+						uc.logger.Errorf("could not retrieve snapshot from backup: %v", err)
 						return nil
 					}
 					break
@@ -71,7 +76,7 @@ func (uc *RestoreUsecasesImpl) GetBackupSnapshot(snapshotId *string) *entities.B
 				if item.Timestamp.Equal(timestamp) {
 					snapshot, err = backupReader.GetBackupSnapshot(item.SnapshotId)
 					if err != nil {
-						uc.logger.Errorf("could not retrieve snapshot from backup: %v\n", err)
+						uc.logger.Errorf("could not retrieve snapshot from backup: %v", err)
 						return nil
 					}
 					break
@@ -81,7 +86,7 @@ func (uc *RestoreUsecasesImpl) GetBackupSnapshot(snapshotId *string) *entities.B
 	} else {
 		snapshot, err = backupReader.GetBackupSnapshot(backupMetadata.Snapshots[len(backupMetadata.Snapshots)-1].SnapshotId)
 		if err != nil {
-			uc.logger.Errorf("could not retrieve snapshot from backup: %v\n", err)
+			uc.logger.Errorf("could not retrieve snapshot from backup: %v", err)
 			return nil
 		}
 	}
@@ -93,9 +98,10 @@ func (uc *RestoreUsecasesImpl) BeginDatabaseRestore() bool {
 	dbWriter := uc.dbFactory.CreateWriter()
 
 	if err := dbWriter.BeginTransaction(); err != nil {
-		uc.logger.Errorf("could not begin DB transaction: %v\n", err)
+		uc.logger.Errorf("could not begin DB transaction: %v", err)
 		return false
 	}
+	uc.logger.Info("started database restoring")
 	return true
 }
 
@@ -103,9 +109,10 @@ func (uc *RestoreUsecasesImpl) CommitDatabaseRestore() bool {
 	dbWriter := uc.dbFactory.CreateWriter()
 
 	if err := dbWriter.CommitTransaction(); err != nil {
-		uc.logger.Errorf("could not commit restored DB: %v\n", err)
+		uc.logger.Errorf("could not commit restored DB: %v", err)
 		return false
 	}
+	uc.logger.Info("finished database restoring successfully")
 	return true
 }
 
@@ -113,9 +120,10 @@ func (uc *RestoreUsecasesImpl) RollbackDatabaseRestore() {
 	dbWriter := uc.dbFactory.CreateWriter()
 	fmt.Println("Process failed. Aborting operation...")
 	fmt.Println("  - Rollback DB to previous state...")
+	uc.logger.Error("failed database restoring")
 
 	if err := dbWriter.RollbackTransaction(); err != nil {
-		uc.logger.Errorf("could not rollback DB to previous state: %v\n", err)
+		uc.logger.Errorf("could not rollback DB to previous state: %v", err)
 		return
 	}
 
@@ -135,12 +143,12 @@ func (uc *RestoreUsecasesImpl) RestoreSchemaDependencies(snapshot *entities.Back
 				fmt.Printf("The %s schema dependency in backup is corrupted\n", dependencyName)
 			}
 
-			uc.logger.Errorf("could not read %s schema dependency from backup: %v\n", dependencyName, err)
+			uc.logger.Errorf("could not read %s schema dependency from backup: %v", dependencyName, err)
 			return false
 		}
 
 		if err := dbWriter.SaveSchemaDependency(dependency); err != nil {
-			uc.logger.Errorf("could not restore %s schema dependency: %v\n", dependencyName, err)
+			uc.logger.Errorf("could not restore %s schema dependency: %v", dependencyName, err)
 			return false
 		}
 
@@ -164,12 +172,12 @@ func (uc *RestoreUsecasesImpl) RestoreSchemas(snapshot *entities.BackupSnapshot)
 				fmt.Printf("The %s schema in backup is corrupted\n", schemaName)
 			}
 
-			uc.logger.Errorf("could not read %s schema from backup: %v\n", schemaName, err)
+			uc.logger.Errorf("could not read %s schema from backup: %v", schemaName, err)
 			return nil
 		}
 
 		if err := dbWriter.SaveSchema(schema); err != nil {
-			uc.logger.Errorf("could not restore %s schema: %v\n", schemaName, err)
+			uc.logger.Errorf("could not restore %s schema: %v", schemaName, err)
 			return nil
 		}
 
@@ -187,7 +195,7 @@ func (uc *RestoreUsecasesImpl) RestoreSchemaRules(snapshot *entities.BackupSnaps
 	fmt.Println("  + Restoring schema rules...")
 	for _, schema := range schemas {
 		if err := dbWriter.SaveSchemaRules(schema); err != nil {
-			uc.logger.Errorf("could not restore %s schema rules: %v\n", schema.GetName(), err)
+			uc.logger.Errorf("could not restore %s schema rules: %v", schema.GetName(), err)
 			return false
 		}
 	}
@@ -202,8 +210,13 @@ func (uc *RestoreUsecasesImpl) RestoreSchemaRecords(snapshot *entities.BackupSna
 
 	backupMetadata, ok := snapshot.Data[schema.GetName()]
 	if !ok {
-		uc.logger.Errorf("%s schema is not present in backup records\n", schema.GetName())
+		uc.logger.Errorf("%s schema is not present in backup records", schema.GetName())
 		return false
+	}
+
+	if len(backupMetadata.Data) == 0 {
+		fmt.Printf("  + There is no records to restore for %s\n", schema.GetName())
+		return true
 	}
 
 	batchProgress := progressbar.NewOptions(len(backupMetadata.Data), progressbar.OptionSetDescription(fmt.Sprintf("  + Restoring all %d batches for %s schema...", len(backupMetadata.Data), schema.GetName())), progressbar.OptionSetWidth(30), progressbar.OptionSetWriter(os.Stdout), progressbar.OptionSetRenderBlankState(true))
@@ -212,7 +225,7 @@ func (uc *RestoreUsecasesImpl) RestoreSchemaRecords(snapshot *entities.BackupSna
 		// Retrieves chunk references in the batch
 		chunkRefs, err := backupReader.GetSchemaRecordChunkRefsInBatch(batch)
 		if err != nil {
-			uc.logger.Errorf("could not retrieve chunk refs from %s schema: %v\n", schema.GetName(), err)
+			uc.logger.Errorf("could not retrieve chunk refs from %s schema: %v", schema.GetName(), err)
 			return false
 		}
 
@@ -221,13 +234,13 @@ func (uc *RestoreUsecasesImpl) RestoreSchemaRecords(snapshot *entities.BackupSna
 			// Retrieves the chunk from the reference
 			chunk, _, err := backupReader.GetSchemaRecordChunk(batch, chunkRef)
 			if err != nil {
-				uc.logger.Errorf("could not retrieve chunk from %s schema: %v\n", schema.GetName(), err)
+				uc.logger.Errorf("could not retrieve chunk from %s schema: %v", schema.GetName(), err)
 				return false
 			}
 
 			// Saves the chunk into DB
 			if err := dbWriter.SaveSchemaRecords(schema, chunk); err != nil {
-				uc.logger.Errorf("could not save records in DB %s schema: %v\n", schema.GetName(), err)
+				uc.logger.Errorf("could not save records in DB %s schema: %v", schema.GetName(), err)
 				return false
 			}
 		}
@@ -272,14 +285,14 @@ func (uc *RestoreUsecasesImpl) restoreSingleRoutine(snapshot *entities.BackupSna
 			fmt.Printf("The %s routine in backup is corrupted\n", routineName)
 		}
 
-		uc.logger.Errorf("could not read %s routine from backup: %v\n", routineName, err)
+		uc.logger.Errorf("could not read %s routine from backup: %v", routineName, err)
 		return nil, false
 	}
 
 	for _, dependency := range routine.GetDependencies() {
 		snapshotDependency, ok := snapshot.Routines[dependency]
 		if !ok {
-			uc.logger.Errorf("could not find %s routine in backup\n", dependency)
+			uc.logger.Errorf("could not find %s routine in backup", dependency)
 			return nil, false
 		}
 
@@ -294,7 +307,7 @@ func (uc *RestoreUsecasesImpl) restoreSingleRoutine(snapshot *entities.BackupSna
 	}
 
 	if err := dbWriter.SaveRoutine(routine); err != nil {
-		uc.logger.Errorf("could not restore %s routine: %v\n", routineName, err)
+		uc.logger.Errorf("could not restore %s routine: %v", routineName, err)
 		return nil, false
 	}
 

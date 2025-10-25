@@ -7,7 +7,6 @@ const (
 )
 
 // SchemaDependency is our main entity used to represent all the schema dependencies metadata in a Database.
-// For relational databases -> Sequences, etc...
 //
 // GetDependencyType() -> Returns the dependency type
 // GetName() -> Returns the schemaDependency name
