@@ -22,6 +22,8 @@ func main() {
 		app.BackupApp(os.Args[2:])
 	case "restore":
 		app.RestoreApp(os.Args[2:])
+	case "log":
+		app.LogApp(os.Args[2:])
 	default:
 		printRootHelp()
 	}

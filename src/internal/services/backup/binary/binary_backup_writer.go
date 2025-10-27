@@ -35,9 +35,6 @@ func (writer *BinaryBackupWriter) CommitSnapshot(metadata *entities.BackupMetada
 		return err
 	}
 
-	newSnapshots := append([]entities.BackupMetadataSnapshot{{Timestamp: writer.TxSnapshot.Timestamp, SnapshotId: writer.TxSnapshot.SnapshotId}}, metadata.Snapshots...)
-	metadata.Snapshots = newSnapshots
-
 	content = metadata.EncodeToBytes()
 	pathToFile = filepath.Join(writer.BackupPath, "metadata.hdb")
 	if err := os.WriteFile(pathToFile, content, 0644); err != nil {

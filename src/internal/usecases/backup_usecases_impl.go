@@ -65,13 +65,19 @@ func (uc *BackupUsecasesImpl) GetSnapshot(snapshotId string) *entities.BackupSna
 	return &snapshot
 }
 
-func (uc *BackupUsecasesImpl) CreateSnapshot(first bool) *entities.BackupSnapshot {
+func (uc *BackupUsecasesImpl) CreateSnapshot(first bool, message string) *entities.BackupSnapshot {
 	backupReader := uc.backupFactory.CreateReader()
 	backupWriter := uc.backupFactory.CreateWriter()
+
+	snapshotMessage := fmt.Sprintf("Database snapshot at %s", time.Now().Format(time.RFC3339))
+	if message != "" {
+		snapshotMessage = message
+	}
 
 	snapshot := entities.BackupSnapshot{
 		SnapshotId:         uuid.NewString(),
 		Timestamp:          time.Now(),
+		Message:            snapshotMessage,
 		SchemaDependencies: make(map[string]string),
 		Schemas:            make(map[string]string),
 		Data:               make(map[string]entities.BackupSnapshotSchemaData),
@@ -102,9 +108,9 @@ func (uc *BackupUsecasesImpl) CommitSnapshot(metadata *entities.BackupMetadata, 
 	backupWriter := uc.backupFactory.CreateWriter()
 
 	if metadata == nil {
-		metadata = &entities.BackupMetadata{DatabaseEngine: uc.dbFactory.GetDBEngine(), Snapshots: []entities.BackupMetadataSnapshot{{Timestamp: snapshot.Timestamp, SnapshotId: snapshot.SnapshotId}}}
+		metadata = &entities.BackupMetadata{DatabaseEngine: uc.dbFactory.GetDBEngine(), Snapshots: []entities.BackupMetadataSnapshot{{Timestamp: snapshot.Timestamp, SnapshotId: snapshot.SnapshotId, Message: snapshot.Message}}}
 	} else {
-		metadata.Snapshots = append(metadata.Snapshots, entities.BackupMetadataSnapshot{Timestamp: snapshot.Timestamp, SnapshotId: snapshot.SnapshotId})
+		metadata.Snapshots = append(metadata.Snapshots, entities.BackupMetadataSnapshot{Timestamp: snapshot.Timestamp, SnapshotId: snapshot.SnapshotId, Message: snapshot.Message})
 	}
 
 	if err := backupWriter.CommitSnapshot(metadata); err != nil {
@@ -338,6 +344,11 @@ func (uc *BackupUsecasesImpl) BackupSchemaRecords(snapshot *entities.BackupSnaps
 	if err != nil {
 		uc.logger.Errorf("could not retrieve %s schema record metadata: %v", schema.GetName(), err)
 		return false
+	}
+
+	if recordMetadata.Count == 0 {
+		fmt.Printf("  + There are no records to save for %s\n", schema.GetName())
+		return true
 	}
 
 	var batchSize, chunkSize int64

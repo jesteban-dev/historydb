@@ -20,7 +20,7 @@ import "historydb/src/internal/entities"
 type BackupUsecases interface {
 	GetBackupMetadata() *entities.BackupMetadata
 	GetSnapshot(snapshotId string) *entities.BackupSnapshot
-	CreateSnapshot(first bool) *entities.BackupSnapshot
+	CreateSnapshot(first bool, message string) *entities.BackupSnapshot
 	CommitSnapshot(metadata *entities.BackupMetadata, snapshot *entities.BackupSnapshot) bool
 	RollbackSnapshot(first bool)
 

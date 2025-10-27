@@ -25,6 +25,7 @@ func BackupApp(args []string) {
 	action := args[0]
 	connString := backupFlags.String("connString", "", "Database connection string")
 	basePath := backupFlags.String("path", "", "Path where the backup directory is located, or where it will be created")
+	message := backupFlags.String("message", "", "Optional message which will be saved in the snapshot")
 	backupFlags.Parse(args[1:])
 
 	engine, err := checkBackupArgsAndObtainEngine(action, *connString, *basePath)
@@ -62,9 +63,9 @@ func BackupApp(args []string) {
 
 	switch action {
 	case "create":
-		backupHandler.CreateBackup()
+		backupHandler.CreateBackup(*message)
 	case "snapshot":
-		backupHandler.SnapshotBackup()
+		backupHandler.SnapshotBackup(*message)
 	}
 }
 
@@ -105,4 +106,5 @@ func printBackupHelp() {
 	fmt.Println("Options:")
 	fmt.Println("  --connString \tDatabase connection string from where to back-up the data")
 	fmt.Println("  --path \tPath where the backup is located, or where it will be created")
+	fmt.Println("  --message \tOptional message which will be saved in the snapshot")
 }

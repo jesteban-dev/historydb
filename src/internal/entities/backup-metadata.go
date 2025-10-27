@@ -80,6 +80,7 @@ func (metadata *BackupMetadata) DecodeFromBytes(data []byte) error {
 type BackupMetadataSnapshot struct {
 	Timestamp  time.Time
 	SnapshotId string
+	Message    string
 }
 
 func (snapshot BackupMetadataSnapshot) EncodeToBytes() []byte {
@@ -87,6 +88,7 @@ func (snapshot BackupMetadataSnapshot) EncodeToBytes() []byte {
 
 	encode.EncodeTime(&buf, &snapshot.Timestamp)
 	encode.EncodeString(&buf, &snapshot.SnapshotId)
+	encode.EncodeString(&buf, &snapshot.Message)
 
 	return buf.Bytes()
 }
@@ -102,15 +104,21 @@ func (snapshot *BackupMetadataSnapshot) DecodeFromBytes(data []byte) (*BackupMet
 	if err != nil {
 		return nil, err
 	}
+	message, err := decode.DecodeString(buf)
+	if err != nil {
+		return nil, err
+	}
 
 	if snapshot == nil {
 		return &BackupMetadataSnapshot{
 			Timestamp:  *timestamp,
 			SnapshotId: *snapshotId,
+			Message:    *message,
 		}, nil
 	} else {
 		snapshot.Timestamp = *timestamp
 		snapshot.SnapshotId = *snapshotId
+		snapshot.Message = *message
 		return nil, nil
 	}
 }

@@ -215,7 +215,7 @@ func (uc *RestoreUsecasesImpl) RestoreSchemaRecords(snapshot *entities.BackupSna
 	}
 
 	if len(backupMetadata.Data) == 0 {
-		fmt.Printf("  + There is no records to restore for %s\n", schema.GetName())
+		fmt.Printf("  + There are no records to restore for %s\n", schema.GetName())
 		return true
 	}
 
