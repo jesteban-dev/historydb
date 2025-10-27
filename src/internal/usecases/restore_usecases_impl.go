@@ -209,7 +209,7 @@ func (uc *RestoreUsecasesImpl) RestoreSchemaRecords(snapshot *entities.BackupSna
 	dbWriter := uc.dbFactory.CreateWriter()
 
 	backupMetadata, ok := snapshot.Data[schema.GetName()]
-	if !ok {
+	if !ok && len(backupMetadata.Data) != 0 {
 		uc.logger.Errorf("%s schema is not present in backup records", schema.GetName())
 		return false
 	}

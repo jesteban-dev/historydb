@@ -10,6 +10,7 @@ import (
 	"historydb/src/internal/utils/decode"
 	"historydb/src/internal/utils/encode"
 	"historydb/src/internal/utils/pointers"
+	"slices"
 )
 
 var PSQLFUNCTION_VERSION int64 = 1
@@ -18,9 +19,9 @@ type PSQLFunction struct {
 	Version      int64
 	Name         string
 	Language     string
-	Volatility   *string
+	Volatility   string
 	Dependencies []string
-	Parameters   *string
+	Parameters   string
 	ReturnType   string
 	Tag          string
 	Definition   string
@@ -58,12 +59,16 @@ func (function *PSQLFunction) Diff(routine entities.Routine, isDiff bool) entiti
 		PrevRef: prevRef,
 	}
 	comparation.AssignIfChanged(&diff.Language, &function.Language, &oldFunction.Language)
-	comparation.AssignIfChanged(&diff.Volatility, function.Volatility, oldFunction.Volatility)
-	comparation.AssignIfChangedSlice(diff.Dependencies, function.Dependencies, oldFunction.Dependencies)
-	comparation.AssignIfChanged(&diff.Parameters, function.Parameters, oldFunction.Parameters)
-	comparation.AssignIfChanged(&diff.ReturnType, &function.ReturnType, &function.ReturnType)
+	comparation.AssignIfChanged(&diff.Volatility, &function.Volatility, &oldFunction.Volatility)
+	comparation.AssignIfChanged(&diff.Parameters, &function.Parameters, &oldFunction.Parameters)
+	comparation.AssignIfChanged(&diff.ReturnType, &function.ReturnType, &oldFunction.ReturnType)
 	comparation.AssignIfChanged(&diff.Tag, &function.Tag, &oldFunction.Tag)
 	comparation.AssignIfChanged(&diff.Definition, &function.Definition, &oldFunction.Definition)
+
+	if !slices.Equal(function.Dependencies, oldFunction.Dependencies) {
+		diff.Dependencies = make([]string, len(function.Dependencies))
+		copy(diff.Dependencies, function.Dependencies)
+	}
 
 	return &diff
 }
@@ -73,12 +78,16 @@ func (function *PSQLFunction) ApplyDiff(diff entities.RoutineDiff) entities.Rout
 	functionDiff := diff.(*PSQLFunctionDiff)
 
 	comparation.AssignIfNotNil(&updateFunction.Language, functionDiff.Language)
-	comparation.AssignIfNotNil(updateFunction.Volatility, functionDiff.Volatility)
-	comparation.AssignSliceIfNotNil(updateFunction.Dependencies, functionDiff.Dependencies)
-	comparation.AssignIfNotNil(updateFunction.Parameters, functionDiff.Parameters)
+	comparation.AssignIfNotNil(&updateFunction.Volatility, functionDiff.Volatility)
+	comparation.AssignIfNotNil(&updateFunction.Parameters, functionDiff.Parameters)
 	comparation.AssignIfNotNil(&updateFunction.ReturnType, functionDiff.ReturnType)
 	comparation.AssignIfNotNil(&updateFunction.Tag, functionDiff.Tag)
 	comparation.AssignIfNotNil(&updateFunction.Definition, functionDiff.Definition)
+
+	if len(updateFunction.Dependencies) == 0 && len(functionDiff.Dependencies) > 0 {
+		updateFunction.Dependencies = make([]string, len(functionDiff.Dependencies))
+		copy(updateFunction.Dependencies, functionDiff.Dependencies)
+	}
 
 	return &updateFunction
 }
@@ -98,8 +107,7 @@ func (function *PSQLFunction) EncodeToBytes() []byte {
 func (function *PSQLFunction) DecodeFromBytes(data []byte) error {
 	buf := bytes.NewBuffer(data)
 
-	var volatility *string
-	var dependencies []string
+	dependencies := []string{}
 
 	if _, err := decode.DecodeString(buf); err != nil {
 		return err
@@ -120,13 +128,11 @@ func (function *PSQLFunction) DecodeFromBytes(data []byte) error {
 	if err != nil {
 		return err
 	}
-	if flags&(1<<0) != 0 {
-		volatility, err = decode.DecodeString(buf)
-		if err != nil {
-			return err
-		}
+	volatility, err := decode.DecodeString(buf)
+	if err != nil {
+		return err
 	}
-	if flags&(1<<1) != 0 {
+	if flags&(1<<0) != 0 {
 		dependencies, err = decode.DecodePrimitiveSlice[string](buf)
 		if err != nil {
 			return err
@@ -152,9 +158,9 @@ func (function *PSQLFunction) DecodeFromBytes(data []byte) error {
 	function.Version = *version
 	function.Name = *name
 	function.Language = *language
-	function.Volatility = volatility
+	function.Volatility = *volatility
 	function.Dependencies = dependencies
-	function.Parameters = parameters
+	function.Parameters = *parameters
 	function.ReturnType = *returnType
 	function.Tag = *tag
 	function.Definition = *definition
@@ -169,9 +175,9 @@ func (function *PSQLFunction) encodeData() []byte {
 	buf.WriteByte(function.getByteFlags())
 	encode.EncodeString(&buf, &function.Name)
 	encode.EncodeString(&buf, &function.Language)
-	encode.EncodeString(&buf, function.Volatility)
+	encode.EncodeString(&buf, &function.Volatility)
 	encode.EncodePrimitiveSlice(&buf, function.Dependencies)
-	encode.EncodeString(&buf, function.Parameters)
+	encode.EncodeString(&buf, &function.Parameters)
 	encode.EncodeString(&buf, &function.ReturnType)
 	encode.EncodeString(&buf, &function.Tag)
 	encode.EncodeString(&buf, &function.Definition)
@@ -181,11 +187,8 @@ func (function *PSQLFunction) encodeData() []byte {
 
 func (function *PSQLFunction) getByteFlags() byte {
 	var flags byte
-	if function.Volatility != nil {
-		flags |= 1 << 0
-	}
 	if len(function.Dependencies) > 0 {
-		flags |= 1 << 1
+		flags |= 1 << 0
 	}
 	return flags
 }

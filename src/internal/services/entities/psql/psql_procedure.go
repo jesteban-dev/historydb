@@ -10,6 +10,7 @@ import (
 	"historydb/src/internal/utils/decode"
 	"historydb/src/internal/utils/encode"
 	"historydb/src/internal/utils/pointers"
+	"slices"
 )
 
 var PSQLPROCEDURE_VERSION int64 = 1
@@ -19,7 +20,7 @@ type PSQLProcedure struct {
 	Name         string
 	Language     string
 	Dependencies []string
-	Parameters   *string
+	Parameters   string
 	Tag          string
 	Definition   string
 }
@@ -56,10 +57,14 @@ func (procedure *PSQLProcedure) Diff(routine entities.Routine, isDiff bool) enti
 		PrevRef: prevRef,
 	}
 	comparation.AssignIfChanged(&diff.Language, &procedure.Language, &oldProcedure.Language)
-	comparation.AssignIfChangedSlice(diff.Dependencies, procedure.Dependencies, oldProcedure.Dependencies)
-	comparation.AssignIfChanged(&diff.Parameters, procedure.Parameters, oldProcedure.Parameters)
+	comparation.AssignIfChanged(&diff.Parameters, &procedure.Parameters, &oldProcedure.Parameters)
 	comparation.AssignIfChanged(&diff.Tag, &procedure.Tag, &oldProcedure.Tag)
 	comparation.AssignIfChanged(&diff.Definition, &procedure.Definition, &oldProcedure.Definition)
+
+	if !slices.Equal(procedure.Dependencies, oldProcedure.Dependencies) {
+		diff.Dependencies = make([]string, len(procedure.Dependencies))
+		copy(diff.Dependencies, procedure.Dependencies)
+	}
 
 	return &diff
 }
@@ -69,10 +74,14 @@ func (procedure *PSQLProcedure) ApplyDiff(diff entities.RoutineDiff) entities.Ro
 	procedureDiff := diff.(*PSQLProcedureDiff)
 
 	comparation.AssignIfNotNil(&updateProcedure.Language, procedureDiff.Language)
-	comparation.AssignSliceIfNotNil(updateProcedure.Dependencies, procedureDiff.Dependencies)
-	comparation.AssignIfNotNil(updateProcedure.Parameters, procedureDiff.Parameters)
+	comparation.AssignIfNotNil(&updateProcedure.Parameters, procedureDiff.Parameters)
 	comparation.AssignIfNotNil(&updateProcedure.Tag, procedureDiff.Tag)
 	comparation.AssignIfNotNil(&updateProcedure.Definition, procedureDiff.Definition)
+
+	if len(updateProcedure.Dependencies) == 0 && len(procedureDiff.Dependencies) > 0 {
+		updateProcedure.Dependencies = make([]string, len(procedureDiff.Dependencies))
+		copy(updateProcedure.Dependencies, procedureDiff.Dependencies)
+	}
 
 	return &updateProcedure
 }
@@ -92,7 +101,7 @@ func (procedure *PSQLProcedure) EncodeToBytes() []byte {
 func (procedure *PSQLProcedure) DecodeFromBytes(data []byte) error {
 	buf := bytes.NewBuffer(data)
 
-	var dependencies []string
+	dependencies := []string{}
 
 	if _, err := decode.DecodeString(buf); err != nil {
 		return err
@@ -136,7 +145,7 @@ func (procedure *PSQLProcedure) DecodeFromBytes(data []byte) error {
 	procedure.Name = *name
 	procedure.Language = *language
 	procedure.Dependencies = dependencies
-	procedure.Parameters = parameters
+	procedure.Parameters = *parameters
 	procedure.Tag = *tag
 	procedure.Definition = *definition
 	return nil
@@ -151,7 +160,7 @@ func (procedure *PSQLProcedure) encodeData() []byte {
 	encode.EncodeString(&buf, &procedure.Name)
 	encode.EncodeString(&buf, &procedure.Language)
 	encode.EncodePrimitiveSlice(&buf, procedure.Dependencies)
-	encode.EncodeString(&buf, procedure.Parameters)
+	encode.EncodeString(&buf, &procedure.Parameters)
 	encode.EncodeString(&buf, &procedure.Tag)
 	encode.EncodeString(&buf, &procedure.Definition)
 
