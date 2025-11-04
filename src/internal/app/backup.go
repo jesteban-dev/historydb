@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"historydb/src/internal/handlers"
@@ -30,6 +31,9 @@ func BackupApp(args []string) {
 
 	engine, err := checkBackupArgsAndObtainEngine(action, *connString, *basePath)
 	if err != nil {
+		if errors.Is(err, ErrUnsuportedAction) || errors.Is(err, ErrArgumentNotProvided) {
+			return
+		}
 		panic(err)
 	}
 
@@ -72,16 +76,16 @@ func BackupApp(args []string) {
 func checkBackupArgsAndObtainEngine(action, connString, path string) (string, error) {
 	if _, ok := supportedBackupActions[action]; !ok {
 		fmt.Printf("The action '%s' is not supported in the backup app.\n", action)
-		return "", fmt.Errorf("unsupported action provided")
+		return "", ErrUnsuportedAction
 	}
 
 	if connString == "" {
 		fmt.Printf("It is required to provide the argument --connString\n")
-		return "", fmt.Errorf("no --connString provided")
+		return "", ErrArgumentNotProvided
 	}
 	if path == "" {
 		fmt.Print("It is required to provide the argument --path\n")
-		return "", fmt.Errorf("no --path provided")
+		return "", ErrArgumentNotProvided
 	}
 
 	parsedCDN, err := url.Parse(connString)

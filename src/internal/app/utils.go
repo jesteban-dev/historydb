@@ -2,6 +2,7 @@ package app
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	backup_services "historydb/src/internal/services/backup"
 	"historydb/src/internal/services/backup/binary"
@@ -9,6 +10,11 @@ import (
 	"historydb/src/internal/services/database/psql"
 
 	_ "github.com/lib/pq"
+)
+
+var (
+	ErrUnsuportedAction    = errors.New("unsupported action provided")
+	ErrArgumentNotProvided = errors.New("required argument not provided")
 )
 
 var supportedBackupActions = map[string]bool{"create": true, "snapshot": true}
