@@ -20,7 +20,7 @@ type Schema interface {
 	GetSchemaType() SchemaType
 	GetName() string
 	Hash() string
-	Diff(schema Schema) SchemaDiff
+	Diff(schema Schema, isDiff bool) SchemaDiff
 	ApplyDiff(diff SchemaDiff) Schema
 	EncodeToBytes() []byte
 	DecodeFromBytes(data []byte) error
