@@ -342,8 +342,9 @@ func runPostgreSQLTests(t *testing.T) {
 	for image, data := range imageData {
 		db, cleanup := setupPostgreSQLContainer(t, image, data.DBName)
 
-		dbReader := database_impl.NewPostgreSQLDatabaseReader(db)
-		testListSchemasDefinition(t, dbReader, data)
+		dbReader := database_impl.NewPSQLDatabaseReader(db)
+		testListSchemas(t, dbReader, data)
+		testGetSchemaDefinition(t, dbReader, data)
 		testGetDatabaseExtraInfo(t, dbReader, data)
 		testGetSchemaDataBatch(t, dbReader, data)
 
@@ -396,55 +397,63 @@ func setupPostgreSQLContainer(t *testing.T, image string, dbName string) (*sql.D
 	return db, cleanup
 }
 
-func testListSchemasDefinition(t *testing.T, dbReader services.DatabaseReader, expectedData DBSQLTestContent) {
-	schemas, err := dbReader.ListSchemasDefinition()
+func testListSchemas(t *testing.T, dbReader services.DatabaseReader, expectedData DBSQLTestContent) {
+	schemaNames, err := dbReader.ListSchemas()
 	assert.Nil(t, err)
-	assert.NotNil(t, schemas)
-	assert.Equal(t, len(expectedData.Tables), len(schemas))
+	assert.NotNil(t, schemaNames)
+	assert.Equal(t, len(expectedData.Tables), len(schemaNames))
 
-	expectedTables := expectedData.Tables
-	for i, schema := range schemas {
+	expectedNames := make([]string, 0, len(expectedData.Tables))
+	for _, table := range expectedData.Tables {
+		expectedNames = append(expectedNames, table.TableName)
+	}
+
+	assert.Equal(t, expectedNames, schemaNames)
+}
+
+func testGetSchemaDefinition(t *testing.T, dbReader services.DatabaseReader, expectedData DBSQLTestContent) {
+	for _, expectedTable := range expectedData.Tables {
+		schema, err := dbReader.GetSchemaDefinition(expectedTable.TableName)
+		assert.Nil(t, err)
+		assert.NotNil(t, schema)
+
 		table := schema.(*entities.SQLTable)
 
-		assert.Equal(t, expectedTables[i].TableName, table.TableName)
-		assert.Equal(t, len(expectedTables[i].Columns), len(table.Columns))
-		assert.Equal(t, len(expectedTables[i].Constraints), len(table.Constraints))
-		assert.Equal(t, len(expectedTables[i].ForeignKeys), len(table.ForeignKeys))
-		assert.Equal(t, len(expectedTables[i].Indexes), len(table.Indexes))
+		assert.Equal(t, expectedTable.TableName, table.TableName)
+		assert.Equal(t, len(expectedTable.Columns), len(table.Columns))
+		assert.Equal(t, len(expectedTable.Constraints), len(table.Constraints))
+		assert.Equal(t, len(expectedTable.ForeignKeys), len(table.ForeignKeys))
+		assert.Equal(t, len(expectedTable.Indexes), len(table.Indexes))
 
-		expectedColumns := expectedTables[i].Columns
 		for j, column := range table.Columns {
-			assert.Equal(t, expectedColumns[j].ColumnName, column.ColumnName)
-			assert.Equal(t, expectedColumns[j].ColumnType, column.ColumnType)
-			assert.Equal(t, expectedColumns[j].IsNullable, column.IsNullable)
-			assert.Equal(t, expectedColumns[j].DefaultValue, column.DefaultValue)
-			assert.Equal(t, expectedColumns[j].ColumnPosition, column.ColumnPosition)
+			assert.Equal(t, expectedTable.Columns[j].ColumnName, column.ColumnName)
+			assert.Equal(t, expectedTable.Columns[j].ColumnType, column.ColumnType)
+			assert.Equal(t, expectedTable.Columns[j].IsNullable, column.IsNullable)
+			assert.Equal(t, expectedTable.Columns[j].DefaultValue, column.DefaultValue)
+			assert.Equal(t, expectedTable.Columns[j].ColumnPosition, column.ColumnPosition)
 		}
 
-		expectedConstraints := expectedTables[i].Constraints
 		for j, constraint := range table.Constraints {
-			assert.Equal(t, expectedConstraints[j].ConstraintType, constraint.ConstraintType)
-			assert.Equal(t, expectedConstraints[j].ConstraintName, constraint.ConstraintName)
-			assert.Equal(t, expectedConstraints[j].Columns, constraint.Columns)
-			assert.Equal(t, expectedConstraints[j].Definition, constraint.Definition)
+			assert.Equal(t, expectedTable.Constraints[j].ConstraintType, constraint.ConstraintType)
+			assert.Equal(t, expectedTable.Constraints[j].ConstraintName, constraint.ConstraintName)
+			assert.Equal(t, expectedTable.Constraints[j].Columns, constraint.Columns)
+			assert.Equal(t, expectedTable.Constraints[j].Definition, constraint.Definition)
 		}
 
-		expectedForeignKeys := expectedTables[i].ForeignKeys
 		for j, fKey := range table.ForeignKeys {
-			assert.Equal(t, expectedForeignKeys[j].ConstraintName, fKey.ConstraintName)
-			assert.Equal(t, expectedForeignKeys[j].Columns, fKey.Columns)
-			assert.Equal(t, expectedForeignKeys[j].ReferencedTable, fKey.ReferencedTable)
-			assert.Equal(t, expectedForeignKeys[j].ReferencedColumns, fKey.ReferencedColumns)
-			assert.Equal(t, expectedForeignKeys[j].UpdateAction, fKey.UpdateAction)
-			assert.Equal(t, expectedForeignKeys[j].DeleteAction, fKey.DeleteAction)
+			assert.Equal(t, expectedTable.ForeignKeys[j].ConstraintName, fKey.ConstraintName)
+			assert.Equal(t, expectedTable.ForeignKeys[j].Columns, fKey.Columns)
+			assert.Equal(t, expectedTable.ForeignKeys[j].ReferencedTable, fKey.ReferencedTable)
+			assert.Equal(t, expectedTable.ForeignKeys[j].ReferencedColumns, fKey.ReferencedColumns)
+			assert.Equal(t, expectedTable.ForeignKeys[j].UpdateAction, fKey.UpdateAction)
+			assert.Equal(t, expectedTable.ForeignKeys[j].DeleteAction, fKey.DeleteAction)
 		}
 
-		expectedIndexes := expectedTables[i].Indexes
 		for j, index := range table.Indexes {
-			assert.Equal(t, expectedIndexes[j].IndexName, index.IndexName)
-			assert.Equal(t, expectedIndexes[j].IndexType, index.IndexType)
-			assert.Equal(t, expectedIndexes[j].Columns, index.Columns)
-			assert.Equal(t, expectedIndexes[j].Options, index.Options)
+			assert.Equal(t, expectedTable.Indexes[j].IndexName, index.IndexName)
+			assert.Equal(t, expectedTable.Indexes[j].IndexType, index.IndexType)
+			assert.Equal(t, expectedTable.Indexes[j].Columns, index.Columns)
+			assert.Equal(t, expectedTable.Indexes[j].Options, index.Options)
 		}
 	}
 }
@@ -483,9 +492,13 @@ func testGetDatabaseExtraInfo(t *testing.T, dbReader services.DatabaseReader, ex
 }
 
 func testGetSchemaDataBatch(t *testing.T, dbReader services.DatabaseReader, expectedData DBSQLTestContent) {
-	schemas, err := dbReader.ListSchemasDefinition()
-	assert.Nil(t, err)
-	assert.NotNil(t, schemas)
+	schemas := make([]entities.Schema, 0, len(expectedData.Tables))
+	for _, table := range expectedData.Tables {
+		schema, err := dbReader.GetSchemaDefinition(table.TableName)
+		assert.Nil(t, err)
+		assert.NotNil(t, schema)
+		schemas = append(schemas, schema)
+	}
 
 	for _, schema := range schemas {
 		table := schema.(*entities.SQLTable)

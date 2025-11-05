@@ -1,7 +1,7 @@
 package backup_impl
 
 import (
-	"historydb/src/internal/services"
+	"historydb/src/internal/services/entities"
 	"os"
 	"path/filepath"
 )
@@ -19,7 +19,7 @@ func (writer *BaseBackupWriter) CreateBackupStructure() error {
 	info, err := os.Stat(writer.BasePath)
 	if err == nil {
 		if info.IsDir() {
-			return services.ErrBackupExists
+			return entities.ErrBackupExists
 		}
 
 		return err
