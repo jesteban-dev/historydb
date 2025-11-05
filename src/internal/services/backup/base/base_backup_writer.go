@@ -13,12 +13,7 @@ type BaseBackupWriter struct {
 }
 
 func (writer *BaseBackupWriter) CreateBackupStructure() error {
-	_, err := os.Stat(writer.BackupPath)
-	if err == nil {
-		return services.ErrBackupDirExists
-	}
-
-	if err := os.Mkdir(writer.BackupPath, 0755); err != nil {
+	if err := os.MkdirAll(writer.BackupPath, 0755); err != nil {
 		return err
 	}
 
@@ -52,7 +47,21 @@ func (writer *BaseBackupWriter) CreateBackupStructure() error {
 }
 
 func (writer *BaseBackupWriter) DeleteBackupStructure() error {
-	return os.RemoveAll(writer.BackupPath)
+	entries, err := os.ReadDir(writer.BackupPath)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			dirPath := filepath.Join(writer.BackupPath, entry.Name())
+			if err := os.RemoveAll(dirPath); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 func (writer *BaseBackupWriter) BeginSnapshot(snapshot *entities.BackupSnapshot) error {

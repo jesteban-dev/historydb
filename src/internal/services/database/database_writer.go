@@ -7,7 +7,11 @@ import "historydb/src/internal/entities"
 // BeginTransaction() -> Begins a DB transaction.
 // CommitTransaction() -> Commits a DB transaction.
 // RollbacksTransaction() -> Rollbacks a DB transaction.
-// SaveSchemaDependency() -> Insert a schema dependency into the DB.
+// SaveSchemaDependency() -> Inserts a schema dependency into the DB.
+// SaveSchema() -> Inserts a schema into the DB.
+// SaveSchemaRules() -> Updates a schema with its rules and constraints in the DB.
+// SaveSchemaRecords() -> Inserts a chunk of data into its schema in the DB.
+// SaveRoutine() -> Inserts a routine into the DB.
 type DatabaseWriter interface {
 	BeginTransaction() error
 	CommitTransaction() error

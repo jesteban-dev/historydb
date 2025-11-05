@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"historydb/src/internal/utils/pointers"
 	"sort"
+	"time"
 )
 
 func EncodeMap(buf *bytes.Buffer, m map[string]interface{}) {
@@ -42,6 +43,9 @@ func EncodeMap(buf *bytes.Buffer, m map[string]interface{}) {
 			case float64:
 				mapBuf.WriteByte(0x04)
 				EncodeFloat(&mapBuf, &val)
+			case time.Time:
+				mapBuf.WriteByte(0x05)
+				EncodeTime(&mapBuf, &val)
 			default:
 				panic(fmt.Sprintf("unsupported type: %T", val))
 			}

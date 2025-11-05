@@ -8,6 +8,7 @@ import (
 	"historydb/src/internal/utils/pointers"
 	"net/url"
 	"os"
+	"path"
 	"time"
 
 	"github.com/google/uuid"
@@ -26,25 +27,35 @@ func RestoreApp(args []string) {
 
 	snapshot, err := checkSnapshot(*snapshotArg)
 	if err != nil {
-		return
+		panic(err)
 	}
 
 	engine, err := checkRestoreArgsAndObtainEngine(*connString, *basePath)
 	if err != nil {
-		return
+		panic(err)
 	}
 
 	db, err := openDBConnection(engine, *connString)
 	if err != nil {
-		return
+		panic(err)
 	}
 	defer db.Close()
 
+	if _, err := os.Stat(*basePath); err != nil {
+		fmt.Println("The specified path does not seem to contain a backup")
+		return
+	}
+	loggerFile, err := os.OpenFile(path.Join(*basePath, "backup.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		panic(err)
+	}
+
 	logger := &logrus.Logger{
-		Out:       os.Stdout,
+		Out:       loggerFile,
 		Level:     logrus.InfoLevel,
 		Formatter: &logrus.TextFormatter{FullTimestamp: true},
 	}
+	logrus.SetLevel(logrus.InfoLevel)
 
 	dbFactory := createDatabaseFactory(engine, db)
 	backupFactory := createBackupFactory(*basePath)

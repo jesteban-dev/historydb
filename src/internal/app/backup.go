@@ -7,6 +7,7 @@ import (
 	"historydb/src/internal/usecases"
 	"net/url"
 	"os"
+	"path"
 
 	"github.com/sirupsen/logrus"
 )
@@ -28,20 +29,29 @@ func BackupApp(args []string) {
 
 	engine, err := checkBackupArgsAndObtainEngine(action, *connString, *basePath)
 	if err != nil {
-		return
+		panic(err)
 	}
 
 	db, err := openDBConnection(engine, *connString)
 	if err != nil {
-		return
+		panic(err)
 	}
 	defer db.Close()
 
+	if err := os.MkdirAll(*basePath, 0755); err != nil {
+		return
+	}
+	loggerFile, err := os.OpenFile(path.Join(*basePath, "backup.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		panic(err)
+	}
+
 	logger := &logrus.Logger{
-		Out:       os.Stdout,
+		Out:       loggerFile,
 		Level:     logrus.InfoLevel,
 		Formatter: &logrus.TextFormatter{FullTimestamp: true},
 	}
+	logrus.SetLevel(logrus.InfoLevel)
 
 	dbFactory := createDatabaseFactory(engine, db)
 	backupFactory := createBackupFactory(*basePath)

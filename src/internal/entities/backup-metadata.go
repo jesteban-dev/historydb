@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// BackupMetadata defines the main metadata file used in the backups
+// BackupMetadata defines a struct which contains all the basic data required by the app
 //
 // DatabaseEngine -> The DB Engine used in the backup
 // Snapshots -> List of all snapshots taken in the backup
@@ -73,6 +73,10 @@ func (metadata *BackupMetadata) DecodeFromBytes(data []byte) error {
 	return nil
 }
 
+// BackupMetadataSnapshot defines the basic info of a struct saved into the BackupMetadata struct to recover the snapshots
+//
+// Timestamp -> The timestamp when the snapshot was taken
+// SnapshotId -> The snapshot identificator
 type BackupMetadataSnapshot struct {
 	Timestamp  time.Time
 	SnapshotId string

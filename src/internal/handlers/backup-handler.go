@@ -15,7 +15,6 @@ func NewBackupHandler(backupUc usecases.BackupUsecases) *BackupHandler {
 func (handler *BackupHandler) CreateBackup() {
 	snapshot := handler.backupUc.CreateSnapshot(true)
 	if snapshot == nil {
-		handler.backupUc.RollbackSnapshot(true)
 		return
 	}
 
