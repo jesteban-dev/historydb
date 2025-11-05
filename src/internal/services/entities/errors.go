@@ -3,5 +3,5 @@ package entities
 import "errors"
 
 var (
-	ErrBackupExists = errors.New("backup path already exists")
+	ErrBackupNeedEmptyDir = errors.New("backup path needs to not exist previously")
 )
