@@ -21,6 +21,10 @@ func (factory *PSQLDatabaseFactory) CreateReader() services.DatabaseReader {
 	return NewPSQLDatabaseReader(factory.db)
 }
 
+func (factory *PSQLDatabaseFactory) CreateWriter() services.DatabaseWriter {
+	return NewPSQLDatabaseWriter(factory.db)
+}
+
 func (factory *PSQLDatabaseFactory) GetDBMetadata() entities.BackupDatabase {
 	return entities.BackupDatabase{Engine: "postgres"}
 }

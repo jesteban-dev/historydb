@@ -2,6 +2,15 @@ package helpers
 
 import "reflect"
 
+func SeachInSlice[T comparable](slice []T, item T) bool {
+	for _, i := range slice {
+		if i == item {
+			return true
+		}
+	}
+	return false
+}
+
 // ToInterfaceSlice converts an interface to a interface slice
 func ToInterfaceSlice(v interface{}) []interface{} {
 	if v == nil {

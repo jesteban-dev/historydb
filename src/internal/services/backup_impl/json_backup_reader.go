@@ -30,6 +30,40 @@ func (reader *JSONBackupReader) ReadBackupMetadata() (entities.BackupMetadata, e
 	return metadata, err
 }
 
+func (reader *JSONBackupReader) ReadSchemaDependency(hash string) (entities.SchemaDependency, error) {
+	var dependency entities.SchemaDependency
+
+	dependencyPath := filepath.Join(reader.basePath, "schemas", "dependencies", fmt.Sprintf("%s.json", hash))
+	byteContent, err := os.ReadFile(dependencyPath)
+	if err != nil {
+		return dependency, err
+	}
+
+	jsonData := serv_entities.JSONRefData{}
+	if err := json.Unmarshal(byteContent, &jsonData); err != nil {
+		return dependency, err
+	}
+
+	if jsonData.PrevRef != nil {
+		sequence, err := reader.ReadSchemaDependency(*jsonData.PrevRef)
+		if err != nil {
+			return sequence, err
+		}
+
+		sequenceDiff := serv_entities.PSQLTableSequenceDiff{}
+		if err := json.Unmarshal(byteContent, &sequenceDiff); err != nil {
+			return sequence, err
+		}
+		sequence = sequence.ApplyDiff(sequenceDiff)
+
+		return sequence, nil
+	} else {
+		sequence := serv_entities.PSQLTableSequence{}
+		err := json.Unmarshal(byteContent, &sequence)
+		return &sequence, err
+	}
+}
+
 func (reader *JSONBackupReader) ReadSchema(hash string) (entities.Schema, error) {
 	var schema entities.Schema
 
@@ -39,26 +73,26 @@ func (reader *JSONBackupReader) ReadSchema(hash string) (entities.Schema, error)
 		return schema, err
 	}
 
-	schemaType := serv_entities.JSONSchemaType{}
-	if err := json.Unmarshal(byteContent, &schemaType); err != nil {
+	jsonData := serv_entities.JSONSchemaData{}
+	if err := json.Unmarshal(byteContent, &jsonData); err != nil {
 		return schema, err
 	}
 
-	if schemaType.PrevRef != nil {
-		schema, err = reader.ReadSchema(*schemaType.PrevRef)
+	if jsonData.PrevRef != nil {
+		schema, err = reader.ReadSchema(*jsonData.PrevRef)
 		if err != nil {
 			return schema, err
 		}
 
-		schemaDiff, err := reader.readSchemaDiffByType(schemaType.SchemaType, byteContent)
+		schemaDiff, err := reader.readSchemaDiffByType(jsonData.SchemaType, byteContent)
 		if err != nil {
 			return schema, err
 		}
 		schema = schema.ApplyDiff(schemaDiff)
 
-		return schema, err
+		return schema, nil
 	} else {
-		return reader.readSchemaByType(schemaType.SchemaType, byteContent)
+		return reader.readSchemaByType(jsonData.SchemaType, byteContent)
 	}
 }
 

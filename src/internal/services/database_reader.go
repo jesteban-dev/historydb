@@ -7,6 +7,8 @@ import "historydb/src/internal/entities"
 // ListSchemaNames obtaines all the schema names from the database.
 // GetSchemaDefinition obtaines the schema from the database given a schema name.
 type DatabaseReader interface {
+	CheckDBIsEmpty() (bool, error)
 	ListSchemaNames() ([]string, error)
+	ListSchemaDependencies() ([]entities.SchemaDependency, error)
 	GetSchemaDefinition(schemaName string) (entities.Schema, error)
 }

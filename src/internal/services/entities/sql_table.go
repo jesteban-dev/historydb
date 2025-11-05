@@ -19,10 +19,10 @@ const (
 type SQLTable struct {
 	SchemaType  SchemaType           `json:"schemaType"`
 	TableName   string               `json:"tableName"`
-	Columns     []SQLTableColumn     `json:"columns"`
-	Constraints []SQLTableConstraint `json:"constraints"`
-	ForeignKeys []SQLTableForeignKey `json:"foreignKeys"`
-	Indexes     []SQLTableIndex      `json:"indexes"`
+	Columns     []SQLTableColumn     `json:"columns,omitempty"`
+	Constraints []SQLTableConstraint `json:"constraints,omitempty"`
+	ForeignKeys []SQLTableForeignKey `json:"foreignKeys,omitempty"`
+	Indexes     []SQLTableIndex      `json:"indexes,omitempty"`
 }
 
 func (table *SQLTable) GetName() string {
@@ -47,9 +47,6 @@ func (table *SQLTable) Diff(schema entities.Schema) entities.SchemaDiff {
 
 	diff.schemaHash, _ = table.Hash()
 	diff.PrevRef, _ = schema.Hash()
-	if table.TableName != oldTable.TableName {
-		diff.TableName = table.TableName
-	}
 	diff.AddedColumns, diff.RemovedColumns = helpers.DiffSlices(table.Columns, oldTable.Columns)
 	diff.AddedConstraints, diff.RemovedConstraints = helpers.DiffSlices(table.Constraints, oldTable.Constraints)
 	diff.AddedForeignKeys, diff.RemovedForeignKeys = helpers.DiffSlices(table.ForeignKeys, oldTable.ForeignKeys)
@@ -61,10 +58,6 @@ func (table *SQLTable) Diff(schema entities.Schema) entities.SchemaDiff {
 func (table *SQLTable) ApplyDiff(diff entities.SchemaDiff) entities.Schema {
 	updatedTable := *table
 	tableDiff := diff.(*SQLTableDiff)
-
-	if tableDiff.TableName != "" {
-		updatedTable.TableName = tableDiff.TableName
-	}
 
 	updatedTable.Columns = make([]SQLTableColumn, 0, len(table.Columns)+len(tableDiff.AddedColumns)-len(tableDiff.RemovedColumns))
 outerColumns:
@@ -133,7 +126,6 @@ type SQLTableDiff struct {
 	schemaHash         string               `json:"-"`
 	SchemaType         SchemaType           `json:"schemaType"`
 	PrevRef            string               `json:"prevRef"`
-	TableName          string               `json:"tablename,omitempty"`
 	AddedColumns       []SQLTableColumn     `json:"addedColumns,omitempty"`
 	RemovedColumns     []SQLTableColumn     `json:"removedColumns,omitempty"`
 	AddedConstraints   []SQLTableConstraint `json:"addedConstraints,omitempty"`
@@ -142,10 +134,6 @@ type SQLTableDiff struct {
 	RemovedForeignKeys []SQLTableForeignKey `json:"removedForeignKeys,omitempty"`
 	AddedIndexes       []SQLTableIndex      `json:"addedIndexes,omitempty"`
 	RemovedIndexes     []SQLTableIndex      `json:"removedIndexes,omitempty"`
-}
-
-func (tableDiff SQLTableDiff) GetPrevRef() string {
-	return tableDiff.PrevRef
 }
 
 func (tableDiff SQLTableDiff) GetSchemaHash() string {

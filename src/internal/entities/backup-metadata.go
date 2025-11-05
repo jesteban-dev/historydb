@@ -18,7 +18,8 @@ type BackupDatabase struct {
 // It saves an ID for the snapshot, the timestamp it was made, and a map that relationates
 // the schemas with the last schema file saved.
 type BackupSnapshot struct {
-	Id        string            `json:"id"`
-	Timestamp time.Time         `json:"timestamp"`
-	Schemas   map[string]string `json:"schemas"`
+	Id                 string            `json:"id"`
+	Timestamp          time.Time         `json:"timestamp"`
+	SchemaDependencies map[string]string `json:"schemaDependencies"`
+	Schemas            map[string]string `json:"schemas"`
 }

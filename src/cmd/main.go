@@ -4,14 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"historydb/src/internal/app"
-	"historydb/src/internal/helpers"
-	"log/slog"
 	"os"
 )
 
 func main() {
-	logger := slog.New(&helpers.LogFormatter{})
-
 	if len(os.Args) < 2 {
 		printRootHelp()
 		return
@@ -23,7 +19,9 @@ func main() {
 
 	switch os.Args[1] {
 	case "backup":
-		app.BackupApp(os.Args[2:], logger)
+		app.BackupApp(os.Args[2:])
+	case "restore":
+		app.RestoreApp(os.Args[2:])
 	default:
 		printRootHelp()
 	}
@@ -34,5 +32,4 @@ func printRootHelp() {
 	fmt.Println("Supported modes:")
 	fmt.Println("  - backup: \tIt creates or updates backups from a database.")
 	fmt.Println("  - restore: \tIt restores your database from a backup.")
-	fmt.Println("  - migrate: \tIt migrate an already existent backup from an engine to a different one.")
 }
