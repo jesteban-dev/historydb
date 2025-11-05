@@ -29,10 +29,10 @@ func openDBConnection(engine string, dsn string) (*sql.DB, error) {
 }
 
 // createDatabaseFactory creates the implementation of the DatabaseFactory needed for the engine provided by the user
-func createDatabaseFactory(engine string, db *sql.DB, host string, port int, dbName string) services.DatabaseFactory {
+func createDatabaseFactory(engine string, db *sql.DB) services.DatabaseFactory {
 	switch engine {
 	case "postgres":
-		return database_impl.NewPSQLDatabaseFactory(db, host, port, dbName)
+		return database_impl.NewPSQLDatabaseFactory(db)
 	default:
 		return nil
 	}
