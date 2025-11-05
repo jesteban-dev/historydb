@@ -6,7 +6,10 @@ import (
 	"historydb/src/internal/entities"
 	"historydb/src/internal/services"
 	"historydb/src/internal/services/entities/psql"
+	sql_entities "historydb/src/internal/services/entities/sql"
 	"strings"
+
+	"github.com/lib/pq"
 )
 
 type PSQLDatabaseWriter struct {
@@ -39,10 +42,14 @@ func (writer *PSQLDatabaseWriter) RollbackTransaction() error {
 }
 
 func (writer *PSQLDatabaseWriter) SaveSchemaDependency(dependency entities.SchemaDependency) error {
+	if writer.tx == nil {
+		return services.ErrDatabaseTransactionNotFound
+	}
+
 	sequence := dependency.(*psql.PSQLSequence)
 	sequenceSchema, sequenceName := writer.parseDBObjectName(sequence.Name)
 
-	if _, err := writer.tx.Exec(fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", sequenceSchema)); err != nil {
+	if _, err := writer.tx.Exec(fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", pq.QuoteIdentifier(sequenceSchema))); err != nil {
 		return err
 	}
 
@@ -52,7 +59,7 @@ func (writer *PSQLDatabaseWriter) SaveSchemaDependency(dependency entities.Schem
 		INCREMENT %d
 		MINVALUE %d
 		MAXVALUE %d
-	`, sequenceSchema, sequenceName, sequence.Type, sequence.Start, sequence.Increment, sequence.Min, sequence.Max)
+	`, pq.QuoteIdentifier(sequenceSchema), pq.QuoteIdentifier(sequenceName), sequence.Type, sequence.Start, sequence.Increment, sequence.Min, sequence.Max)
 	if sequence.IsCycle {
 		query += " CYCLE"
 	} else {
@@ -63,7 +70,7 @@ func (writer *PSQLDatabaseWriter) SaveSchemaDependency(dependency entities.Schem
 		return err
 	}
 
-	updateQuery := fmt.Sprintf("ALTER SEQUENCE %s.%s", sequenceSchema, sequenceName)
+	updateQuery := fmt.Sprintf("ALTER SEQUENCE %s.%s", pq.QuoteIdentifier(sequenceSchema), pq.QuoteIdentifier(sequenceName))
 	if sequence.IsCalled {
 		updateQuery += fmt.Sprintf(" RESTART WITH %d", sequence.LastValue+sequence.Increment)
 	} else {
@@ -72,6 +79,88 @@ func (writer *PSQLDatabaseWriter) SaveSchemaDependency(dependency entities.Schem
 
 	_, err := writer.tx.Exec(updateQuery)
 	return err
+}
+
+func (writer *PSQLDatabaseWriter) SaveSchema(schema entities.Schema) error {
+	if writer.tx == nil {
+		return services.ErrDatabaseTransactionNotFound
+	}
+
+	table := schema.(*sql_entities.SQLTable)
+	tableSchema, tableName := writer.parseDBObjectName(table.Name)
+
+	if _, err := writer.tx.Exec(fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", pq.QuoteIdentifier(tableSchema))); err != nil {
+		return err
+	}
+
+	query := fmt.Sprintf("CREATE TABLE %s.%s (", pq.QuoteIdentifier(tableSchema), pq.QuoteIdentifier(tableName))
+	for i, col := range table.Columns {
+		query += fmt.Sprintf("%s %s", col.Name, col.Type)
+		if !col.IsNullable {
+			query += " NOT NULL"
+		}
+		if col.DefaultValue != nil {
+			query += fmt.Sprintf(" DEFAULT %s", *col.DefaultValue)
+		}
+		if i < len(table.Columns)-1 {
+			query += ", "
+		}
+	}
+	if len(table.Constraints) > 0 {
+		for _, c := range table.Constraints {
+			if c.Type == sql_entities.Check {
+				query += fmt.Sprintf(", CONSTRAINT %s %s %s", c.Name, c.Type, *c.Definition)
+			} else {
+				query += fmt.Sprintf(", CONSTRAINT %s %s (%s)", c.Name, c.Type, strings.Join(c.Columns, ", "))
+			}
+		}
+	}
+	query += ");"
+
+	_, err := writer.tx.Exec(query)
+	return err
+}
+
+func (writer *PSQLDatabaseWriter) SaveSchemaRules(schema entities.Schema) error {
+	if writer.tx == nil {
+		return services.ErrDatabaseTransactionNotFound
+	}
+
+	table := schema.(*sql_entities.SQLTable)
+	tableSchema, tableName := writer.parseDBObjectName(table.Name)
+
+	for _, fk := range table.ForeignKeys {
+		query := fmt.Sprintf(
+			"ALTER TABLE %s.%s ADD CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s (%s) ON UPDATE %s ON DELETE %s;",
+			pq.QuoteIdentifier(tableSchema),
+			pq.QuoteIdentifier(tableName),
+			fk.Name,
+			strings.Join(fk.Columns, ", "),
+			fk.ReferencedTable,
+			strings.Join(fk.ReferencedColumns, ", "),
+			fk.UpdateAction,
+			fk.DeleteAction,
+		)
+		if _, err := writer.tx.Exec(query); err != nil {
+			return err
+		}
+	}
+
+	for _, idx := range table.Indexes {
+		query := fmt.Sprintf(
+			"CREATE INDEX %s ON %s.%s USING %s (%s);",
+			idx.Name,
+			pq.QuoteIdentifier(tableSchema),
+			pq.QuoteIdentifier(tableName),
+			idx.Type,
+			strings.Join(idx.Columns, ", "),
+		)
+		if _, err := writer.tx.Exec(query); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (writer *PSQLDatabaseWriter) parseDBObjectName(objectName string) (string, string) {
