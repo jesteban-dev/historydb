@@ -29,7 +29,10 @@ type SchemaRecordMetadata struct {
 type SchemaRecordChunk interface {
 	Length() int
 	Hash() string
+	GetRecordType() RecordType
 	Diff(chunk SchemaRecordChunk, isDiff bool) SchemaRecordChunkDiff
+	DiffFromEmpty() SchemaRecordChunkDiff
+	DiffToEmpty(isDiff bool) SchemaRecordChunkDiff
 	ApplyDiff(diff SchemaRecordChunkDiff) SchemaRecordChunk
 	EncodeToBytes() []byte
 	DecodeFromBytes(data []byte) error
@@ -45,6 +48,7 @@ type SchemaRecordChunkDiff interface {
 	Length() int
 	Hash() *string
 	GetPrevRef() *string
+	GetRecordType() RecordType
 	EncodeToBytes() []byte
 	DecodeFromBytes(data []byte) error
 	ApplyDiffFromEmpty() SchemaRecordChunk

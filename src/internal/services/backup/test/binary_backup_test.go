@@ -25,7 +25,6 @@ type SchemaInfo struct {
 
 type RecordBatchInfo struct {
 	batchName   string
-	batchType   entities.RecordType
 	chunks      []entities.SchemaRecordChunk
 	toDiffNames []string
 	toDiff      [][]entities.SchemaRecordChunk
@@ -292,7 +291,6 @@ func TestBinaryBackup(t *testing.T) {
 		"Table1": {
 			{
 				batchName: "Batch1-1",
-				batchType: entities.SQLRecord,
 				chunks: []entities.SchemaRecordChunk{
 					&sql.SQLRecordChunk{Content: []sql.SQLRecord{
 						{Content: map[string]interface{}{"Column1": 1, "Column2": "test1"}},
@@ -305,7 +303,6 @@ func TestBinaryBackup(t *testing.T) {
 				},
 			}, {
 				batchName: "Batch1-2",
-				batchType: entities.SQLRecord,
 				chunks: []entities.SchemaRecordChunk{
 					&sql.SQLRecordChunk{Content: []sql.SQLRecord{
 						{Content: map[string]interface{}{"Column1": 5, "Column2": "test5"}},
@@ -317,7 +314,6 @@ func TestBinaryBackup(t *testing.T) {
 		"Table2": {
 			{
 				batchName: "Batch2-1",
-				batchType: entities.SQLRecord,
 				chunks: []entities.SchemaRecordChunk{
 					&sql.SQLRecordChunk{Content: []sql.SQLRecord{
 						{Content: map[string]interface{}{"Column2": "test1", "Column3": 1}},
@@ -340,7 +336,6 @@ func TestBinaryBackup(t *testing.T) {
 		"Table3": {
 			{
 				batchName: "Batch3-1",
-				batchType: entities.SQLRecord,
 				chunks: []entities.SchemaRecordChunk{
 					&sql.SQLRecordChunk{Content: []sql.SQLRecord{
 						{Content: map[string]interface{}{"Column2": "test1", "Column3": 1}},
@@ -440,7 +435,7 @@ func TestBinaryBackup(t *testing.T) {
 		for i, batch := range v {
 			batchTempRef := fmt.Sprintf("temp-%s", batch.batchName)
 			for _, chunk := range batch.chunks {
-				err = backupWriter.SaveSchemaRecordChunk(batchTempRef, batch.batchType, chunk)
+				err = backupWriter.SaveSchemaRecordChunk(batchTempRef, chunk)
 				assert.Nil(t, err)
 			}
 
@@ -453,7 +448,7 @@ func TestBinaryBackup(t *testing.T) {
 					if len(batch.chunks) > l {
 						diff := chunkDiff.Diff(batch.chunks[l], false)
 
-						err = backupWriter.SaveSchemaRecordChunkDiff(batch.batchName, batch.toDiffNames[j], batch.batchType, diff)
+						err = backupWriter.SaveSchemaRecordChunkDiff(batch.batchName, batch.toDiffNames[j], diff)
 						assert.Nil(t, err)
 
 						batches[i] = batch.toDiffNames[j]

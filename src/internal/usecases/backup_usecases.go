@@ -15,6 +15,6 @@ type BackupUsecases interface {
 	BackupSchemas(snapshot *entities.BackupSnapshot) []entities.Schema
 	SnapshotSchemas(lastSnapshot, snapshot *entities.BackupSnapshot) []entities.Schema
 
-	BackupSchemaData(snapshot *entities.BackupSnapshot, schema entities.Schema) bool
-	SnapshotSchemaData(lastSnapshot, snapshot *entities.BackupSnapshot, schema entities.Schema) bool
+	BackupSchemaRecords(snapshot *entities.BackupSnapshot, schema entities.Schema) bool
+	SnapshotSchemaRecords(lastSnapshot, snapshot *entities.BackupSnapshot, schema entities.Schema) bool
 }

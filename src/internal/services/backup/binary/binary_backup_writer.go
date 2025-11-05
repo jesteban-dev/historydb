@@ -137,7 +137,7 @@ func (writer *BinaryBackupWriter) SaveSchemaDiff(diff entities.SchemaDiff) error
 	return os.WriteFile(pathToFile, content, 0644)
 }
 
-func (writer *BinaryBackupWriter) SaveSchemaRecordChunk(batchRef string, recordType entities.RecordType, chunk entities.SchemaRecordChunk) error {
+func (writer *BinaryBackupWriter) SaveSchemaRecordChunk(batchRef string, chunk entities.SchemaRecordChunk) error {
 	if writer.TxSnapshot == nil {
 		return services.ErrBackupTransactionNotFound
 	}
@@ -160,7 +160,7 @@ func (writer *BinaryBackupWriter) SaveSchemaRecordChunk(batchRef string, recordT
 	}
 	if info.Size() == 0 {
 		var recordTypeBytes bytes.Buffer
-		encode.EncodeString(&recordTypeBytes, pointers.Ptr(string(recordType)))
+		encode.EncodeString(&recordTypeBytes, pointers.Ptr(string(chunk.GetRecordType())))
 		f.Write(recordTypeBytes.Bytes())
 	}
 
@@ -169,7 +169,7 @@ func (writer *BinaryBackupWriter) SaveSchemaRecordChunk(batchRef string, recordT
 	return err
 }
 
-func (writer *BinaryBackupWriter) SaveSchemaRecordChunkDiff(prevBatchRef, batchRef string, recordType entities.RecordType, chunk entities.SchemaRecordChunkDiff) error {
+func (writer *BinaryBackupWriter) SaveSchemaRecordChunkDiff(prevBatchRef, batchRef string, chunk entities.SchemaRecordChunkDiff) error {
 	if writer.TxSnapshot == nil {
 		return services.ErrBackupTransactionNotFound
 	}
@@ -192,7 +192,7 @@ func (writer *BinaryBackupWriter) SaveSchemaRecordChunkDiff(prevBatchRef, batchR
 	}
 	if info.Size() == 0 {
 		var batchInit bytes.Buffer
-		encode.EncodeString(&batchInit, pointers.Ptr(string(recordType)))
+		encode.EncodeString(&batchInit, pointers.Ptr(string(chunk.GetRecordType())))
 		encode.EncodeString(&batchInit, pointers.Ptr(prevBatchRef))
 		f.Write(batchInit.Bytes())
 	}

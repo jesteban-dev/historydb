@@ -25,7 +25,7 @@ type BackupWriter interface {
 	SaveSchema(schema entities.Schema) error
 	SaveSchemaDiff(diff entities.SchemaDiff) error
 
-	SaveSchemaRecordChunk(batchRef string, recordType entities.RecordType, chunk entities.SchemaRecordChunk) error
-	SaveSchemaRecordChunkDiff(prevBatchRef, batchRef string, recordType entities.RecordType, chunk entities.SchemaRecordChunkDiff) error
+	SaveSchemaRecordChunk(batchRef string, chunk entities.SchemaRecordChunk) error
+	SaveSchemaRecordChunkDiff(prevBatchRef, batchRef string, chunk entities.SchemaRecordChunkDiff) error
 	SaveSchemaRecordBatch(batchTempRef, batchRef string) error
 }
