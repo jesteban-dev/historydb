@@ -25,9 +25,17 @@ func (handler *RestoreHanlder) RestoreDatabase(snapshotId *string) {
 		return
 	}
 
-	if ok := handler.restoreUc.RestoreSchemas(snapshot); !ok {
+	schemas := handler.restoreUc.RestoreSchemas(snapshot)
+	if schemas == nil {
 		handler.restoreUc.RollbackDatabaseRestore()
 		return
+	}
+
+	for _, schema := range schemas {
+		if ok := handler.restoreUc.RestoreSchemaRecords(snapshot, schema); !ok {
+			handler.restoreUc.RollbackDatabaseRestore()
+			return
+		}
 	}
 
 	if ok := handler.restoreUc.CommitDatabaseRestore(); !ok {

@@ -22,3 +22,14 @@ var ComparablePK = map[string]bool{
 	"inet":                        true,
 	"cidr":                        true,
 }
+
+var NonQuoteTypes = map[string]bool{
+	"smallint":         true,
+	"integer":          true,
+	"bigint":           true,
+	"decimal":          true,
+	"numeric":          true,
+	"real":             true,
+	"double precision": true,
+	"boolean":          true,
+}

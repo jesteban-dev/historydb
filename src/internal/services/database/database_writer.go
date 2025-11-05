@@ -16,4 +16,5 @@ type DatabaseWriter interface {
 	SaveSchemaDependency(dependency entities.SchemaDependency) error
 	SaveSchema(schema entities.Schema) error
 	SaveSchemaRules(schema entities.Schema) error
+	SaveSchemaRecords(schema entities.Schema, chunk entities.SchemaRecordChunk) error
 }
