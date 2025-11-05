@@ -10,9 +10,10 @@ import (
 	_ "github.com/lib/pq"
 )
 
-var supportedActions = map[string]bool{"create": true}
+var supportedBackupActions = map[string]bool{"create": true, "snapshot": true}
 var supportedEngines = map[string]string{"postgres": "postgres", "postgresql": "postgres"}
 
+// openDBConnection opens a sql.DB connection from the DSN provided bny the user
 func openDBConnection(engine string, dsn string) (*sql.DB, error) {
 	db, err := sql.Open(engine, dsn)
 	if err != nil {
@@ -27,6 +28,7 @@ func openDBConnection(engine string, dsn string) (*sql.DB, error) {
 	return db, nil
 }
 
+// createDatabaseFactory creates the implementation of the DatabaseFactory needed for the engine provided by the user
 func createDatabaseFactory(engine string, db *sql.DB, host string, port int, dbName string) services.DatabaseFactory {
 	switch engine {
 	case "postgres":
@@ -36,6 +38,7 @@ func createDatabaseFactory(engine string, db *sql.DB, host string, port int, dbN
 	}
 }
 
+// createBackupFactory creates the implementation of the BackupFactory needed
 func createBackupFactory(basePath string) services.BackupFactory {
 	return backup_impl.NewJSONBackupFactory(basePath)
 }

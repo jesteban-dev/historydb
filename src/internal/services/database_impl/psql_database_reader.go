@@ -20,8 +20,6 @@ func NewPSQLDatabaseReader(db *sql.DB) *PSQLDatabaseReader {
 	return &PSQLDatabaseReader{db}
 }
 
-// ListSchemas obtains all table names in the psql database.
-// As PSQL has schemes, the table names are composed by <scheme-name>.<table-name>
 func (dbReader *PSQLDatabaseReader) ListSchemaNames() ([]string, error) {
 	rows, err := dbReader.db.Query(`
 		SELECT table_schema, table_name

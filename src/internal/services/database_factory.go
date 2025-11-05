@@ -6,4 +6,5 @@ import "historydb/src/internal/entities"
 type DatabaseFactory interface {
 	CreateReader() DatabaseReader
 	GetDBMetadata() entities.BackupDatabase
+	CheckBackupDB(db entities.BackupDatabase) bool
 }
