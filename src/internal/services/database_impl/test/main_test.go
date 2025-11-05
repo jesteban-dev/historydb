@@ -10,8 +10,15 @@ import (
 )
 
 type DBSQLTestContent struct {
-	DBName string
-	Tables []entities.SQLTable
+	DBName       string
+	Tables       []entities.SQLTable
+	TableContent map[string]DBSQLTableContent
+}
+
+type DBSQLTableContent struct {
+	DataLength int
+	ChunkSize  int
+	Rows       []entities.TableRow
 }
 
 var dbCases = []string{"postgres"}
