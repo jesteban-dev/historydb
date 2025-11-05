@@ -9,6 +9,8 @@ import (
 	"historydb/src/internal/services/database_impl"
 	"historydb/src/internal/services/database_impl/entities"
 	"log"
+	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -272,6 +274,9 @@ var imageData = map[string]DBSQLTestContent{
 			{SequenceName: "public.orders_orderid_seq", DataType: "integer", StartValue: uint(1), MinimumValue: uint(1), MaximumValue: uint(2147483647), Increment: uint(1), CycleOption: false, LastValue: uint(12000), IsCalled: true},
 			{SequenceName: "public.products_prod_id_seq", DataType: "integer", StartValue: uint(1), MinimumValue: uint(1), MaximumValue: uint(2147483647), Increment: uint(1), CycleOption: false, LastValue: uint(10000), IsCalled: true},
 		},
+		Routines: []entities.PSQLRoutine{
+			{RoutineType: entities.RoutineTypeFunction, RoutineName: "public.new_customer", Arguments: []entities.PSQLArgument{{Name: "firstname_in", Type: "character varying"}, {Name: "lastname_in", Type: "character varying"}, {Name: "address1_in", Type: "character varying"}, {Name: "address2_in", Type: "character varying"}, {Name: "city_in", Type: "character varying"}, {Name: "state_in", Type: "character varying"}, {Name: "zip_in", Type: "integer"}, {Name: "country_in", Type: "character varying"}, {Name: "region_in", Type: "integer"}, {Name: "email_in", Type: "character varying"}, {Name: "phone_in", Type: "character varying"}, {Name: "creditcardtype_in", Type: "integer"}, {Name: "creditcard_in", Type: "character varying"}, {Name: "creditcardexpiration_in", Type: "character varying"}, {Name: "username_in", Type: "character varying"}, {Name: "password_in", Type: "character varying"}, {Name: "age_in", Type: "integer"}, {Name: "income_in", Type: "integer"}, {Name: "gender_in", Type: "character varying"}, {Name: "customerid_out", Type: "integer", IsOut: true}}, ReturnType: "integer", Language: "plpgsql", Definition: "$function$ DECLARE rows_returned INT; BEGIN SELECT COUNT(*) INTO rows_returned FROM CUSTOMERS WHERE USERNAME = username_in; IF rows_returned = 0 THEN INSERT INTO CUSTOMERS ( FIRSTNAME, LASTNAME, EMAIL, PHONE, USERNAME, PASSWORD, ADDRESS1, ADDRESS2, CITY, STATE, ZIP, COUNTRY, REGION, CREDITCARDTYPE, CREDITCARD, CREDITCARDEXPIRATION, AGE, INCOME, GENDER ) VALUES ( firstname_in, lastname_in, email_in, phone_in, username_in, password_in, address1_in, address2_in, city_in, state_in, zip_in, country_in, region_in, creditcardtype_in, creditcard_in, creditcardexpiration_in, age_in, income_in, gender_in ) ; select currval(pg_get_serial_sequence('customers', 'customerid')) into customerid_out; ELSE customerid_out := 0; END IF; END $function$"},
+		},
 		TableContent: map[string]DBSQLTableContent{
 			"public.categories": {BatchSize: 4, Rows: []entities.TableRow{
 				{"category": int64(1), "categoryname": "Action"},
@@ -451,6 +456,7 @@ func testGetDatabaseExtraInfo(t *testing.T, dbReader services.DatabaseReader, ex
 
 	info := extraInfo.(*entities.PSQLDBExtraInfo)
 	assert.Equal(t, len(expectedData.Sequences), len(info.Sequences))
+	assert.Equal(t, len(expectedData.Routines), len(info.Routines))
 
 	expectedSequences := expectedData.Sequences
 	for i, sequence := range info.Sequences {
@@ -463,6 +469,16 @@ func testGetDatabaseExtraInfo(t *testing.T, dbReader services.DatabaseReader, ex
 		assert.Equal(t, expectedSequences[i].CycleOption, sequence.CycleOption)
 		assert.Equal(t, expectedSequences[i].LastValue, sequence.LastValue)
 		assert.Equal(t, expectedSequences[i].IsCalled, sequence.IsCalled)
+	}
+
+	expectedRoutines := expectedData.Routines
+	for i, routine := range info.Routines {
+		assert.Equal(t, expectedRoutines[i].ReturnType, routine.ReturnType)
+		assert.Equal(t, expectedRoutines[i].RoutineName, routine.RoutineName)
+		assert.Equal(t, expectedRoutines[i].Arguments, routine.Arguments)
+		assert.Equal(t, expectedRoutines[i].ReturnType, routine.ReturnType)
+		assert.Equal(t, expectedRoutines[i].Language, routine.Language)
+		assert.Equal(t, normalizeRoutineDefinition(expectedRoutines[i].Definition), normalizeRoutineDefinition(routine.Definition))
 	}
 }
 
@@ -501,4 +517,13 @@ func testGetSchemaDataBatch(t *testing.T, dbReader services.DatabaseReader, expe
 			cursor = nextCursor
 		}
 	}
+}
+
+func normalizeRoutineDefinition(def string) string {
+	replaced := strings.ReplaceAll(def, "\n", " ")
+	replaced = strings.ReplaceAll(replaced, "\t", " ")
+
+	space := regexp.MustCompile(`\s+`)
+	collapsed := space.ReplaceAllString(replaced, " ")
+	return strings.TrimSpace(collapsed)
 }
