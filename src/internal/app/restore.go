@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"historydb/src/internal/handlers"
@@ -23,7 +24,9 @@ func RestoreApp(args []string) {
 	basePath := restoreFlags.String("path", "", "Path where the backup is located")
 	snapshotArg := restoreFlags.String("from", "", "Snapshot ID or Timestamp from where to restore the database")
 
-	restoreFlags.Parse(args)
+	if err := restoreFlags.Parse(args); err != nil {
+		return
+	}
 
 	snapshot, err := checkSnapshot(*snapshotArg)
 	if err != nil {
@@ -32,6 +35,9 @@ func RestoreApp(args []string) {
 
 	engine, err := checkRestoreArgsAndObtainEngine(*connString, *basePath)
 	if err != nil {
+		if errors.Is(err, ErrUnsuportedAction) || errors.Is(err, ErrArgumentNotProvided) {
+			return
+		}
 		panic(err)
 	}
 
@@ -85,11 +91,11 @@ func checkSnapshot(snapshot string) (*string, error) {
 func checkRestoreArgsAndObtainEngine(connString, path string) (string, error) {
 	if connString == "" {
 		fmt.Printf("It is required to provide the argument --connString\n")
-		return "", fmt.Errorf("no --connString provided")
+		return "", ErrArgumentNotProvided
 	}
 	if path == "" {
 		fmt.Print("It is required to provide the argument --path\n")
-		return "", fmt.Errorf("no --path provided")
+		return "", ErrArgumentNotProvided
 	}
 
 	parsedCDN, err := url.Parse(connString)
