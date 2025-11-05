@@ -1,38 +1,112 @@
 package entities
 
-import "time"
+import (
+	"bytes"
+	"crypto/sha256"
+	"historydb/src/internal/utils/decode"
+	"historydb/src/internal/utils/encode"
+	"time"
+)
 
 // BackupMetadata defines the main metadata file used in the backups
 //
 // DatabaseEngine -> The DB Engine used in the backup
 // Snapshots -> List of all snapshots taken in the backup
 type BackupMetadata struct {
-	DatabaseEngine string           `json:"dbEngine"`
-	Snapshots      []BackupSnapshot `json:"snapshots"`
+	DatabaseEngine string
+	Snapshots      []BackupMetadataSnapshot
 }
 
-// BackupSnapshot defines the main info for all the snapshots taken in the backup
-//
-// Id -> Snaphost Id
-// Timestamp -> Timestamp the snapshot was taken
-// Schemas -> map that links every schema with its schema backup file
-// Data -> map that link every schema with its schema backup data files
-type BackupSnapshot struct {
-	Id                 string                              `json:"id"`
-	Timestamp          time.Time                           `json:"timestamp"`
-	SchemaDependencies map[string]string                   `json:"schemaDependencies"`
-	Schemas            map[string]string                   `json:"schemas"`
-	Data               map[string]BackupSnapshotSchemaData `json:"data"`
+func (metadata *BackupMetadata) EncodeToBytes() []byte {
+	var buf bytes.Buffer
+
+	encodedData := metadata.encodeData()
+	integrityHash := sha256.Sum256(encodedData)
+
+	buf.Write(integrityHash[:])
+	buf.Write(encodedData)
+
+	return buf.Bytes()
 }
 
-// BackupSnapshotSchemaData defines the info saved from each schema in a snapshot
-// that serves to rebuild the schema data.
-//
-// BatchSize -> The max-size for all batches used to save the schema data.
-// ChunkSize -> The max-size for all chunks used to save the schema data.
-// Data -> A string of paths that represents all the batch files needed to rebuild the schema data.
-type BackupSnapshotSchemaData struct {
-	BatchSize int      `json:"batchSize"`
-	ChunkSize int      `json:"chunkSize"`
-	Data      []string `json:"data"`
+func (metadata *BackupMetadata) encodeData() []byte {
+	var buf bytes.Buffer
+
+	var flags byte
+	if len(metadata.Snapshots) > 0 {
+		flags |= 1 << 0
+	}
+
+	buf.WriteByte(flags)
+	encode.EncodeString(&buf, &metadata.DatabaseEngine)
+	encode.EncodeSlice(&buf, metadata.Snapshots)
+
+	return buf.Bytes()
+}
+
+func (metadata *BackupMetadata) DecodeFromBytes(data []byte) error {
+	buf := bytes.NewBuffer(data)
+
+	flags, err := buf.ReadByte()
+	if err != nil {
+		return err
+	}
+	engine, err := decode.DecodeString(buf)
+	if err != nil {
+		return err
+	}
+	var snapshotSlice []BackupMetadataSnapshot
+	if flags&(1<<0) != 0 {
+		snapshots, err := decode.DecodeSlice[*BackupMetadataSnapshot](buf)
+		if err != nil {
+			return err
+		}
+
+		snapshotSlice = make([]BackupMetadataSnapshot, 0, len(snapshots))
+		for _, v := range snapshots {
+			snapshotSlice = append(snapshotSlice, *v)
+		}
+	}
+
+	metadata.DatabaseEngine = *engine
+	metadata.Snapshots = snapshotSlice
+	return nil
+}
+
+type BackupMetadataSnapshot struct {
+	Timestamp  time.Time
+	SnapshotId string
+}
+
+func (snapshot BackupMetadataSnapshot) EncodeToBytes() []byte {
+	var buf bytes.Buffer
+
+	encode.EncodeTime(&buf, &snapshot.Timestamp)
+	encode.EncodeString(&buf, &snapshot.SnapshotId)
+
+	return buf.Bytes()
+}
+
+func (snapshot *BackupMetadataSnapshot) DecodeFromBytes(data []byte) (*BackupMetadataSnapshot, error) {
+	buf := bytes.NewBuffer(data)
+
+	timestamp, err := decode.DecodeTime(buf)
+	if err != nil {
+		return nil, err
+	}
+	snapshotId, err := decode.DecodeString(buf)
+	if err != nil {
+		return nil, err
+	}
+
+	if snapshot == nil {
+		return &BackupMetadataSnapshot{
+			Timestamp:  *timestamp,
+			SnapshotId: *snapshotId,
+		}, nil
+	} else {
+		snapshot.Timestamp = *timestamp
+		snapshot.SnapshotId = *snapshotId
+		return nil, nil
+	}
 }

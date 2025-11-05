@@ -8,7 +8,6 @@ import (
 	services "historydb/src/internal/services/database"
 	"historydb/src/internal/services/database/psql"
 	psql_entities "historydb/src/internal/services/entities/psql"
-	"historydb/src/internal/utilsOld/pointers"
 	"log"
 	"testing"
 	"time"
@@ -37,15 +36,15 @@ var imageData = map[string]PSQLTestContent{
 		DBName:  "dellstore",
 		IsEmpty: false,
 		Sequences: []psql_entities.PSQLSequence{
-			{DependencyType: entities.PSQLSequence, Version: psql_entities.CURRENT_VERSION, Name: "public.categories_category_seq", Type: pointers.Pointer("integer"), Start: pointers.Pointer(1), Min: pointers.Pointer(1), Max: pointers.Pointer(2147483647), Increment: pointers.Pointer(1), IsCycle: pointers.Pointer(false), LastValue: pointers.Pointer(16), IsCalled: pointers.Pointer(true)},
-			{DependencyType: entities.PSQLSequence, Version: psql_entities.CURRENT_VERSION, Name: "public.customers_customerid_seq", Type: pointers.Pointer("integer"), Start: pointers.Pointer(1), Min: pointers.Pointer(1), Max: pointers.Pointer(2147483647), Increment: pointers.Pointer(1), IsCycle: pointers.Pointer(false), LastValue: pointers.Pointer(20000), IsCalled: pointers.Pointer(true)},
-			{DependencyType: entities.PSQLSequence, Version: psql_entities.CURRENT_VERSION, Name: "public.orders_orderid_seq", Type: pointers.Pointer("integer"), Start: pointers.Pointer(1), Min: pointers.Pointer(1), Max: pointers.Pointer(2147483647), Increment: pointers.Pointer(1), IsCycle: pointers.Pointer(false), LastValue: pointers.Pointer(12000), IsCalled: pointers.Pointer(true)},
-			{DependencyType: entities.PSQLSequence, Version: psql_entities.CURRENT_VERSION, Name: "public.products_prod_id_seq", Type: pointers.Pointer("integer"), Start: pointers.Pointer(1), Min: pointers.Pointer(1), Max: pointers.Pointer(2147483647), Increment: pointers.Pointer(1), IsCycle: pointers.Pointer(false), LastValue: pointers.Pointer(10000), IsCalled: pointers.Pointer(true)},
+			{DependencyType: entities.PSQLSequence, Version: psql_entities.CURRENT_VERSION, Name: "public.categories_category_seq", Type: "integer", Start: 1, Min: 1, Max: 2147483647, Increment: 1, IsCycle: false, LastValue: 16, IsCalled: true},
+			{DependencyType: entities.PSQLSequence, Version: psql_entities.CURRENT_VERSION, Name: "public.customers_customerid_seq", Type: "integer", Start: 1, Min: 1, Max: 2147483647, Increment: 1, IsCycle: false, LastValue: 20000, IsCalled: true},
+			{DependencyType: entities.PSQLSequence, Version: psql_entities.CURRENT_VERSION, Name: "public.orders_orderid_seq", Type: "integer", Start: 1, Min: 1, Max: 2147483647, Increment: 1, IsCycle: false, LastValue: 12000, IsCalled: true},
+			{DependencyType: entities.PSQLSequence, Version: psql_entities.CURRENT_VERSION, Name: "public.products_prod_id_seq", Type: "integer", Start: 1, Min: 1, Max: 2147483647, Increment: 1, IsCycle: false, LastValue: 10000, IsCalled: true},
 		},
 	},
 }
 
-func runPSQLReaderTests(t *testing.T) {
+func TestPSQLReader(t *testing.T) {
 	for image, data := range imageData {
 		db, cleanup := setupPSQLContainer(t, image, data.DBName)
 
@@ -111,9 +110,6 @@ func testCheckDBIsEmpty(t *testing.T, dbReader services.DatabaseReader, expected
 func testListSchemaDependencies(t *testing.T, dbReader services.DatabaseReader, expectedData []psql_entities.PSQLSequence) {
 	schemaDependencies, err := dbReader.ListSchemaDependencies()
 	assert.Nil(t, err)
-	if len(expectedData) == 1 {
-		fmt.Println(expectedData[0])
-	}
 	assert.Equal(t, len(expectedData), len(schemaDependencies))
 
 	for i, dependency := range schemaDependencies {

@@ -2,24 +2,9 @@ package test
 
 import (
 	"fmt"
-	"log"
 	"net/url"
 	"strings"
-	"testing"
 )
-
-var dbCases = []string{"postgres"}
-
-func TestMain(t *testing.T) {
-	for _, dbType := range dbCases {
-		switch dbType {
-		case "postgres":
-			runPSQLReaderTests(t)
-		default:
-			log.Fatalf("unsupported DB: %s", dbType)
-		}
-	}
-}
 
 func parseDatabaseURL(dbUrl string) (string, error) {
 	dbUrl = strings.TrimSuffix(dbUrl, "?")

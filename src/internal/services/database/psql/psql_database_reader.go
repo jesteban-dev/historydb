@@ -61,14 +61,14 @@ func (reader *PSQLDatabaseReader) ListSchemaDependencies() ([]entities.SchemaDep
 			DependencyType: entities.PSQLSequence,
 			Version:        psql.CURRENT_VERSION,
 			Name:           fmt.Sprintf("%s.%s", sequence_schema, sequence_name),
-			Type:           &data_type,
-			Start:          &start_value,
-			Min:            &minimum_value,
-			Max:            &maximum_value,
-			Increment:      &increment,
-			IsCycle:        &cycle_option,
-			LastValue:      &lastValue,
-			IsCalled:       &isCalled,
+			Type:           data_type,
+			Start:          start_value,
+			Min:            minimum_value,
+			Max:            maximum_value,
+			Increment:      increment,
+			IsCycle:        cycle_option,
+			LastValue:      lastValue,
+			IsCalled:       isCalled,
 		})
 	}
 
