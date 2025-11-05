@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"historydb/src/internal/utils/pointers"
 	"sort"
 )
 
@@ -24,15 +25,23 @@ func EncodeMap(buf *bytes.Buffer, m map[string]interface{}) {
 			EncodeString(&mapBuf, &k)
 
 			switch val := v.(type) {
+			case nil:
+				mapBuf.WriteByte(0x00)
 			case string:
 				mapBuf.WriteByte(0x01)
 				EncodeString(&mapBuf, &val)
-			case int:
+			case int64:
 				mapBuf.WriteByte(0x02)
 				EncodeInt(&mapBuf, &val)
+			case int:
+				mapBuf.WriteByte(0x02)
+				EncodeInt(&mapBuf, pointers.Ptr(int64(val)))
 			case bool:
 				mapBuf.WriteByte(0x03)
 				EncodeBool(&mapBuf, &val)
+			case float64:
+				mapBuf.WriteByte(0x04)
+				EncodeFloat(&mapBuf, &val)
 			default:
 				panic(fmt.Sprintf("unsupported type: %T", val))
 			}

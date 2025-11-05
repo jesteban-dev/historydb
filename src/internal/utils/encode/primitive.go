@@ -13,9 +13,9 @@ func EncodeString(buf *bytes.Buffer, s *string) {
 	}
 }
 
-func EncodeInt(buf *bytes.Buffer, i *int) {
+func EncodeInt(buf *bytes.Buffer, i *int64) {
 	if i != nil {
-		binary.Write(buf, binary.LittleEndian, int64(*i))
+		binary.Write(buf, binary.LittleEndian, *i)
 	}
 }
 
@@ -26,6 +26,12 @@ func EncodeBool(buf *bytes.Buffer, b *bool) {
 		} else {
 			buf.WriteByte(0)
 		}
+	}
+}
+
+func EncodeFloat(buf *bytes.Buffer, f *float64) {
+	if f != nil {
+		binary.Write(buf, binary.LittleEndian, *f)
 	}
 }
 

@@ -20,12 +20,12 @@ type PSQLSequence struct {
 	Version        string
 	Name           string
 	Type           string
-	Start          int
-	Min            int
-	Max            int
-	Increment      int
+	Start          int64
+	Min            int64
+	Max            int64
+	Increment      int64
 	IsCycle        bool
-	LastValue      int
+	LastValue      int64
 	IsCalled       bool
 }
 
@@ -180,12 +180,12 @@ type PSQLSequenceDiff struct {
 	hash      string
 	PrevRef   string
 	Type      *string
-	Start     *int
-	Min       *int
-	Max       *int
-	Increment *int
+	Start     *int64
+	Min       *int64
+	Max       *int64
+	Increment *int64
 	IsCycle   *bool
-	LastValue *int
+	LastValue *int64
 	IsCalled  *bool
 }
 
@@ -227,28 +227,28 @@ func (diff *PSQLSequenceDiff) DecodeFromBytes(data []byte) error {
 			return err
 		}
 	}
-	var start *int
+	var start *int64
 	if flags&(1<<1) != 0 {
 		start, err = decode.DecodeInt(buf)
 		if err != nil {
 			return err
 		}
 	}
-	var min *int
+	var min *int64
 	if flags&(1<<2) != 0 {
 		min, err = decode.DecodeInt(buf)
 		if err != nil {
 			return err
 		}
 	}
-	var max *int
+	var max *int64
 	if flags&(1<<3) != 0 {
 		max, err = decode.DecodeInt(buf)
 		if err != nil {
 			return err
 		}
 	}
-	var increment *int
+	var increment *int64
 	if flags&(1<<4) != 0 {
 		increment, err = decode.DecodeInt(buf)
 		if err != nil {
@@ -262,7 +262,7 @@ func (diff *PSQLSequenceDiff) DecodeFromBytes(data []byte) error {
 			return err
 		}
 	}
-	var lastValue *int
+	var lastValue *int64
 	if flags&(1<<6) != 0 {
 		lastValue, err = decode.DecodeInt(buf)
 		if err != nil {

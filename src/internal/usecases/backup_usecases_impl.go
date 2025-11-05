@@ -73,6 +73,7 @@ func (uc *BackupUsecasesImpl) CreateSnapshot(first bool) *entities.BackupSnapsho
 		Timestamp:          time.Now(),
 		SchemaDependencies: make(map[string]string),
 		Schemas:            make(map[string]string),
+		Data:               make(map[string]entities.BackupSnapshotSchemaData),
 	}
 	if first {
 		if err := backupWriter.CreateBackupStructure(); err != nil {
@@ -206,6 +207,8 @@ func (uc *BackupUsecasesImpl) SnapshotSchemaDependencies(lastSnapshot, snapshot 
 			}
 
 			snapshot.SchemaDependencies[dependency.GetName()] = fmt.Sprintf("diffs/%s", hash)
+		} else {
+			snapshot.SchemaDependencies[dependency.GetName()] = prevHash
 		}
 
 		schemaDependenciesProgress.Add(1)
@@ -308,8 +311,11 @@ func (uc *BackupUsecasesImpl) SnapshotSchemas(lastSnapshot, snapshot *entities.B
 			}
 
 			snapshot.Schemas[schemaName] = fmt.Sprintf("diffs/%s", hash)
+		} else {
+			snapshot.Schemas[schemaName] = prevHash
 		}
 
+		schemas = append(schemas, schema)
 		schemaProgress.Add(1)
 	}
 
@@ -328,20 +334,19 @@ func (uc *BackupUsecasesImpl) BackupSchemaRecords(snapshot *entities.BackupSnaps
 		return false
 	}
 
-	var batchSize, chunkSize int
+	var batchSize, chunkSize int64
 	if recordMetadata.MaxRecordSize < entities.LIMIT_RECORD_SIZE {
-		batchSize = int(math.Min(float64(entities.SMALL_FILE_MAX_SIZE)/float64(recordMetadata.MaxRecordSize), float64(entities.MAX_BATCH_LENGTH)))
+		batchSize = int64(math.Min(float64(entities.SMALL_FILE_MAX_SIZE)/float64(recordMetadata.MaxRecordSize), float64(entities.MAX_BATCH_LENGTH)))
 		chunkSize = batchSize / 100
 	} else {
-		batchSize = entities.BIG_FILE_MAX_SIZE / recordMetadata.MaxRecordSize
+		batchSize = int64(entities.BIG_FILE_MAX_SIZE / recordMetadata.MaxRecordSize)
 		chunkSize = batchSize / 10
 	}
 
 	// Loops until savedRecords == Database total records
 	savedRecords := 0
 	batchHashes := []string{}
-	dataProgress := progressbar.NewOptions(int(math.Ceil(float64(recordMetadata.Count)/float64(chunkSize))), progressbar.OptionSetDescription(fmt.Sprintf("  + Saving %s schema data...", schema.GetName())), progressbar.OptionSetWidth(30), progressbar.OptionSetWriter(os.Stdout), progressbar.OptionSetRenderBlankState(true))
-
+	dataProgress := progressbar.NewOptions(int(math.Ceil(float64(recordMetadata.Count)/float64(chunkSize))), progressbar.OptionSetDescription(fmt.Sprintf("  + Saving %s schema records...", schema.GetName())), progressbar.OptionSetWidth(30), progressbar.OptionSetWriter(os.Stdout), progressbar.OptionSetRenderBlankState(true))
 	for savedRecords < recordMetadata.Count {
 		currentBatchSize := 0
 		tempBatchName := uuid.NewString()
@@ -349,11 +354,11 @@ func (uc *BackupUsecasesImpl) BackupSchemaRecords(snapshot *entities.BackupSnaps
 
 		// Loops until batch is full or there is no more content
 		var cursor interface{}
-		for currentBatchSize < batchSize {
+		for currentBatchSize < int(batchSize) {
 			// Reads record chunk from DB
 			chunk, nextCursor, err := dbReader.GetSchemaRecordChunk(schema, chunkSize, cursor)
 			if err != nil {
-				uc.logger.Errorf("coudl not retrieve record chunk from %s schema: %v\n", schema.GetName(), err)
+				uc.logger.Errorf("could not retrieve record chunk from %s schema: %v\n", schema.GetName(), err)
 				return false
 			}
 
@@ -386,7 +391,7 @@ func (uc *BackupUsecasesImpl) BackupSchemaRecords(snapshot *entities.BackupSnaps
 		batchHashes = append(batchHashes, batchHash)
 		savedRecords += currentBatchSize
 	}
-	fmt.Println("  - All schema data saved successfully")
+	fmt.Println("  - All schema records saved successfully")
 
 	snapshot.Data[schema.GetName()] = entities.BackupSnapshotSchemaData{
 		BatchSize: batchSize,
@@ -421,6 +426,7 @@ func (uc *BackupUsecasesImpl) SnapshotSchemaRecords(lastSnapshot, snapshot *enti
 		Data:      []string{},
 	}
 	// Loops until savedRecords == Database total records
+	dataProgress := progressbar.NewOptions(int(math.Ceil(float64(recordMetadata.Count)/float64(backupMetadata.ChunkSize))), progressbar.OptionSetDescription(fmt.Sprintf("  + Updating %s schema records...", schema.GetName())), progressbar.OptionSetWidth(30), progressbar.OptionSetWriter(os.Stdout), progressbar.OptionSetRenderBlankState(true))
 	for savedRecords < recordMetadata.Count {
 		currentBatchSize := 0
 		batchHashBytes := sha256.New()
@@ -428,7 +434,7 @@ func (uc *BackupUsecasesImpl) SnapshotSchemaRecords(lastSnapshot, snapshot *enti
 
 		// Calculates all new chunk hashes in batch
 		var cursor interface{}
-		for currentBatchSize < backupMetadata.BatchSize {
+		for currentBatchSize < int(backupMetadata.BatchSize) {
 			// Reads record chunk from DB
 			chunk, nextCursor, err := dbReader.GetSchemaRecordChunk(schema, backupMetadata.ChunkSize, cursor)
 			if err != nil {
@@ -448,6 +454,7 @@ func (uc *BackupUsecasesImpl) SnapshotSchemaRecords(lastSnapshot, snapshot *enti
 			cursor = nextCursor
 			batchHashBytes.Write([]byte(chunkHash))
 			batchHashBytes.Write([]byte("|"))
+			dataProgress.Add(1)
 		}
 
 		// Calculates new batch hash
@@ -502,7 +509,7 @@ func (uc *BackupUsecasesImpl) SnapshotSchemaRecords(lastSnapshot, snapshot *enti
 						}
 					}
 
-					if err := backupWriter.SaveSchemaRecordChunkDiff(backupMetadata.Data[batchIndex], batchHash, recordDiff); err != nil {
+					if err := backupWriter.SaveSchemaRecordChunkDiff(backupMetadata.Data[batchIndex], fmt.Sprintf("diffs/%s", batchHash), recordDiff); err != nil {
 						uc.logger.Errorf("could not update %s schema record chunk into backup: %v\n", schema.GetName(), err)
 						return false
 					}
@@ -539,8 +546,10 @@ func (uc *BackupUsecasesImpl) SnapshotSchemaRecords(lastSnapshot, snapshot *enti
 			snapshotData.Data = append(snapshotData.Data, batchHash)
 		}
 
+		savedRecords += currentBatchSize
 		batchIndex++
 	}
+	fmt.Println("  - All schema records updated successfully")
 
 	snapshot.Data[schema.GetName()] = snapshotData
 	return true

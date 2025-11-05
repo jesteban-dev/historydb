@@ -14,7 +14,7 @@ func EncodePrimitiveSlice[T string | int | bool](buf *bytes.Buffer, s []T) {
 			case string:
 				vv := val
 				EncodeString(&sliceBuf, &vv)
-			case int:
+			case int64:
 				vv := val
 				EncodeInt(&sliceBuf, &vv)
 			case bool:

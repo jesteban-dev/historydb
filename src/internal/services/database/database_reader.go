@@ -17,5 +17,5 @@ type DatabaseReader interface {
 	ListSchemaNames() ([]string, error)
 	GetSchemaDefinition(schemaName string) (entities.Schema, error)
 	GetSchemaRecordMetadata(schemaName string) (entities.SchemaRecordMetadata, error)
-	GetSchemaRecordChunk(schema entities.Schema, chunkSize int, chunkCursor interface{}) (entities.SchemaRecordChunk, interface{}, error)
+	GetSchemaRecordChunk(schema entities.Schema, chunkSize int64, chunkCursor interface{}) (entities.SchemaRecordChunk, interface{}, error)
 }

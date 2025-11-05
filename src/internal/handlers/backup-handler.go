@@ -1,6 +1,8 @@
 package handlers
 
-import "historydb/src/internal/usecases"
+import (
+	"historydb/src/internal/usecases"
+)
 
 type BackupHandler struct {
 	backupUc usecases.BackupUsecases

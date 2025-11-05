@@ -45,7 +45,7 @@ func (uc *RestoreUsecasesImpl) GetBackupSnapshot(snapshotId *string) *entities.B
 		return nil
 	}
 
-	if uc.backupFactory.GetBackupEncoding() != backupMetadata.DatabaseEngine {
+	if uc.dbFactory.GetDBEngine() != backupMetadata.DatabaseEngine {
 		fmt.Println("The database and backup engines does not match")
 		return nil
 	}
@@ -177,16 +177,22 @@ func (uc *RestoreUsecasesImpl) RestoreSchemas(snapshot *entities.BackupSnapshot)
 	}
 	fmt.Println("  - All schemas restored successfully")
 
+	return schemas
+}
+
+func (uc *RestoreUsecasesImpl) RestoreSchemaRules(snapshot *entities.BackupSnapshot, schemas []entities.Schema) bool {
+	dbWriter := uc.dbFactory.CreateWriter()
+
 	fmt.Println("  + Restoring schema rules...")
 	for _, schema := range schemas {
 		if err := dbWriter.SaveSchemaRules(schema); err != nil {
 			uc.logger.Errorf("could not restore %s schema rules: %v\n", schema.GetName(), err)
-			return nil
+			return false
 		}
 	}
 
 	fmt.Println("  - All schema rules restored successfully")
-	return schemas
+	return true
 }
 
 func (uc *RestoreUsecasesImpl) RestoreSchemaRecords(snapshot *entities.BackupSnapshot, schema entities.Schema) bool {
