@@ -12,8 +12,8 @@ func NewBackupHandler(backupUc usecases.BackupUsecases) *BackupHandler {
 	return &BackupHandler{backupUc}
 }
 
-func (handler *BackupHandler) CreateBackup() {
-	snapshot := handler.backupUc.CreateSnapshot(true)
+func (handler *BackupHandler) CreateBackup(message string) {
+	snapshot := handler.backupUc.CreateSnapshot(true, message)
 	if snapshot == nil {
 		return
 	}
@@ -46,7 +46,7 @@ func (handler *BackupHandler) CreateBackup() {
 	}
 }
 
-func (handler *BackupHandler) SnapshotBackup() {
+func (handler *BackupHandler) SnapshotBackup(message string) {
 	backupMetadata := handler.backupUc.GetBackupMetadata()
 	if backupMetadata == nil {
 		return
@@ -56,7 +56,7 @@ func (handler *BackupHandler) SnapshotBackup() {
 		return
 	}
 
-	newSnapshot := handler.backupUc.CreateSnapshot(false)
+	newSnapshot := handler.backupUc.CreateSnapshot(false, message)
 	if newSnapshot == nil {
 		handler.backupUc.RollbackSnapshot(false)
 		return

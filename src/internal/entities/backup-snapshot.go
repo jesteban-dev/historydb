@@ -20,6 +20,7 @@ import (
 type BackupSnapshot struct {
 	Timestamp          time.Time
 	SnapshotId         string
+	Message            string
 	SchemaDependencies map[string]string
 	Schemas            map[string]string
 	Data               map[string]BackupSnapshotSchemaData
@@ -58,6 +59,7 @@ func (snapshot *BackupSnapshot) encodeData() []byte {
 	buf.WriteByte(flags)
 	encode.EncodeTime(&buf, &snapshot.Timestamp)
 	encode.EncodeString(&buf, &snapshot.SnapshotId)
+	encode.EncodeString(&buf, &snapshot.Message)
 	encode.EncodeMap(&buf, types.ToInterfaceMap(snapshot.SchemaDependencies))
 	encode.EncodeMap(&buf, types.ToInterfaceMap(snapshot.Schemas))
 	encode.EncodeStructMap(&buf, snapshot.Data)
@@ -78,6 +80,10 @@ func (snapshot *BackupSnapshot) DecodeFromBytes(data []byte) error {
 		return err
 	}
 	snapshotId, err := decode.DecodeString(buf)
+	if err != nil {
+		return err
+	}
+	message, err := decode.DecodeString(buf)
 	if err != nil {
 		return err
 	}
@@ -131,6 +137,7 @@ func (snapshot *BackupSnapshot) DecodeFromBytes(data []byte) error {
 
 	snapshot.Timestamp = *timestamp
 	snapshot.SnapshotId = *snapshotId
+	snapshot.Message = *message
 	snapshot.SchemaDependencies = schemaDependenciesMap
 	snapshot.Schemas = schemasMap
 	snapshot.Data = dataMap
