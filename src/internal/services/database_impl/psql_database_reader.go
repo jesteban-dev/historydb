@@ -81,7 +81,7 @@ func (dbReader *PSQLDatabaseReader) ListSchemaDependencies() ([]entities.SchemaD
 			return nil, err
 		}
 
-		sequences = append(sequences, serv_entities.PSQLTableSequence{
+		sequences = append(sequences, &serv_entities.PSQLTableSequence{
 			Name:      fmt.Sprintf("%s.%s", sequence_schema, sequence_name),
 			Type:      &data_type,
 			Start:     &start_value,
