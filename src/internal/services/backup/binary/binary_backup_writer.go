@@ -211,3 +211,35 @@ func (writer *BinaryBackupWriter) SaveSchemaRecordBatch(batchTempRef, batchRef s
 	newPath := filepath.Join(writer.BackupPath, writer.TxSnapshot.SnapshotId, "data", fmt.Sprintf("%s.hdb", batchRef))
 	return os.Rename(oldPath, newPath)
 }
+
+func (writer *BinaryBackupWriter) SaveRoutine(routine entities.Routine) error {
+	if writer.TxSnapshot == nil {
+		return services.ErrBackupTransactionNotFound
+	}
+
+	content := routine.EncodeToBytes()
+	hash := routine.Hash()
+
+	pathToFile := filepath.Join(writer.BackupPath, writer.TxSnapshot.SnapshotId, "routines", fmt.Sprintf("%s.hdb", hash))
+	if err := os.MkdirAll(filepath.Dir(pathToFile), 0755); err != nil {
+		return err
+	}
+
+	return os.WriteFile(pathToFile, content, 0644)
+}
+
+func (writer *BinaryBackupWriter) SaveRoutineDiff(diff entities.RoutineDiff) error {
+	if writer.TxSnapshot == nil {
+		return services.ErrBackupTransactionNotFound
+	}
+
+	content := diff.EncodeToBytes()
+	hash := diff.Hash()
+
+	pathToFile := filepath.Join(writer.BackupPath, writer.TxSnapshot.SnapshotId, "routines", "diffs", fmt.Sprintf("%s.hdb", hash))
+	if err := os.MkdirAll(filepath.Dir(pathToFile), 0755); err != nil {
+		return err
+	}
+
+	return os.WriteFile(pathToFile, content, 0644)
+}

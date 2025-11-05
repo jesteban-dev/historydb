@@ -124,8 +124,8 @@ func (reader *BinaryBackupReader) GetSchemaDependency(dependencyRef string) (ent
 	}
 }
 
-func (reader *BinaryBackupReader) GetSchema(filename string) (entities.Schema, bool, error) {
-	pathToFile := filepath.Join(reader.backupPath, "schemas", fmt.Sprintf("%s.hdb", filename))
+func (reader *BinaryBackupReader) GetSchema(schemaRef string) (entities.Schema, bool, error) {
+	pathToFile := filepath.Join(reader.backupPath, "schemas", fmt.Sprintf("%s.hdb", schemaRef))
 	data, err := os.ReadFile(pathToFile)
 	if err != nil {
 		return nil, false, err
@@ -142,7 +142,7 @@ func (reader *BinaryBackupReader) GetSchema(filename string) (entities.Schema, b
 		return nil, false, fmt.Errorf("%w: %s", services.ErrBackupCorruptedFile, pathToFile)
 	}
 
-	if strings.HasPrefix(filename, "diffs") {
+	if strings.HasPrefix(schemaRef, "diffs") {
 		prevRef, err := decode.DecodeString(bytes.NewBuffer(content))
 		if err != nil {
 			return nil, false, err
@@ -266,6 +266,53 @@ func (reader *BinaryBackupReader) GetSchemaRecordChunk(batchRef, chunkRef string
 	} else {
 		chunk, err := reader.readSchemaRecordChunkByType(entities.RecordType(recordType), chunkRef, f)
 		return chunk, false, err
+	}
+}
+
+func (reader *BinaryBackupReader) GetRoutine(routineRef string) (entities.Routine, bool, error) {
+	pathToFile := filepath.Join(reader.backupPath, "routines", fmt.Sprintf("%s.hdb", routineRef))
+	data, err := os.ReadFile(pathToFile)
+	if err != nil {
+		return nil, false, err
+	}
+
+	if len(data) < sha256.Size {
+		return nil, false, fmt.Errorf("%w: %s", services.ErrBackupCorruptedFile, pathToFile)
+	}
+
+	hashBytes := data[:sha256.Size]
+	content := data[sha256.Size:]
+
+	if ok := crypto.CheckDataSignature(hashBytes, content); !ok {
+		return nil, false, fmt.Errorf("%w: %s", services.ErrBackupCorruptedFile, pathToFile)
+	}
+
+	if strings.HasPrefix(routineRef, "diffs") {
+		prevRef, err := decode.DecodeString(bytes.NewBuffer(content))
+		if err != nil {
+			return nil, false, err
+		}
+
+		routine, _, err := reader.GetRoutine(*prevRef)
+		if err != nil {
+			return nil, false, err
+		}
+
+		routineDiff, err := reader.readRoutineDiffByType(routine.GetRoutineType(), content)
+		if err != nil {
+			return nil, false, err
+		}
+
+		routine = routine.ApplyDiff(routineDiff)
+		return routine, true, nil
+	} else {
+		routineType, err := decode.DecodeString(bytes.NewBuffer(content))
+		if err != nil {
+			return nil, false, err
+		}
+
+		routine, err := reader.readRoutineByType(entities.RoutineType(*routineType), content)
+		return routine, false, err
 	}
 }
 
@@ -453,5 +500,55 @@ func (reader *BinaryBackupReader) readSchemaDataChunkDiffByType(recordType entit
 		return nil, services.ErrBackupChunkNotFound
 	default:
 		return nil, services.ErrRecordNotSupported
+	}
+}
+
+func (reader *BinaryBackupReader) readRoutineByType(routineType entities.RoutineType, content []byte) (entities.Routine, error) {
+	switch routineType {
+	case entities.PSQLFunction:
+		var function psql.PSQLFunction
+		if err := function.DecodeFromBytes(content); err != nil {
+			return nil, err
+		}
+		return &function, nil
+	case entities.PSQLProcedure:
+		var procedure psql.PSQLProcedure
+		if err := procedure.DecodeFromBytes(content); err != nil {
+			return nil, err
+		}
+		return &procedure, nil
+	case entities.PSQLTrigger:
+		var trigger psql.PSQLTrigger
+		if err := trigger.DecodeFromBytes(content); err != nil {
+			return nil, err
+		}
+		return &trigger, nil
+	default:
+		return nil, services.ErrRoutineNotSupported
+	}
+}
+
+func (reader *BinaryBackupReader) readRoutineDiffByType(routineType entities.RoutineType, content []byte) (entities.RoutineDiff, error) {
+	switch routineType {
+	case entities.PSQLFunction:
+		var diff psql.PSQLFunctionDiff
+		if err := diff.DecodeFromBytes(content); err != nil {
+			return nil, err
+		}
+		return &diff, nil
+	case entities.PSQLProcedure:
+		var diff psql.PSQLProcedureDiff
+		if err := diff.DecodeFromBytes(content); err != nil {
+			return nil, err
+		}
+		return &diff, nil
+	case entities.PSQLTrigger:
+		var diff psql.PSQLTriggerDiff
+		if err := diff.DecodeFromBytes(content); err != nil {
+			return nil, err
+		}
+		return &diff, nil
+	default:
+		return nil, services.ErrRoutineNotSupported
 	}
 }

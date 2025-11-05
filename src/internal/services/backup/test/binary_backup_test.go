@@ -30,17 +30,21 @@ type RecordBatchInfo struct {
 	toDiff      [][]entities.SchemaRecordChunk
 }
 
+type RoutineInfo struct {
+	routine entities.Routine
+	toDiff  []entities.Routine
+}
+
 var expectedDependencies map[string]entities.SchemaDependency = map[string]entities.SchemaDependency{
-	"Sequence1": &psql.PSQLSequence{DependencyType: entities.PSQLSequence, Version: "1", Name: "Sequence1", Type: "integer", Start: 1, Min: 1, Max: 1000, Increment: 1, IsCycle: false, LastValue: 20, IsCalled: false},
-	"Sequence2": &psql.PSQLSequence{DependencyType: entities.PSQLSequence, Version: "1", Name: "Sequence2", Type: "integer", Start: 20, Min: 2, Max: 100, Increment: 2, IsCycle: false, LastValue: 40, IsCalled: true},
-	"Sequence3": &psql.PSQLSequence{DependencyType: entities.PSQLSequence, Version: "1", Name: "Sequence3", Type: "integer", Start: 1, Min: 2, Max: 10000, Increment: 3, IsCycle: false, LastValue: 20, IsCalled: true},
+	"Sequence1": &psql.PSQLSequence{Version: 1, Name: "Sequence1", Type: "integer", Start: 1, Min: 1, Max: 1000, Increment: 1, IsCycle: false, LastValue: 20, IsCalled: false},
+	"Sequence2": &psql.PSQLSequence{Version: 1, Name: "Sequence2", Type: "integer", Start: 20, Min: 2, Max: 100, Increment: 2, IsCycle: false, LastValue: 40, IsCalled: true},
+	"Sequence3": &psql.PSQLSequence{Version: 1, Name: "Sequence3", Type: "integer", Start: 1, Min: 2, Max: 10000, Increment: 3, IsCycle: false, LastValue: 20, IsCalled: true},
 }
 
 var expectedSchemas map[string]entities.Schema = map[string]entities.Schema{
 	"Table1": &sql.SQLTable{
-		SchemaType: entities.SQLTable,
-		Version:    "1",
-		Name:       "Table1",
+		Version: 1,
+		Name:    "Table1",
 		Columns: []sql.SQLTableColumn{
 			{Name: "Column1", Type: "integer", IsNullable: false, DefaultValue: pointers.Ptr("1"), Position: 1},
 			{Name: "Column2", Type: "varying character(10)", IsNullable: true, Position: 2},
@@ -50,9 +54,8 @@ var expectedSchemas map[string]entities.Schema = map[string]entities.Schema{
 		},
 	},
 	"Table2": &sql.SQLTable{
-		SchemaType: entities.SQLTable,
-		Version:    "1",
-		Name:       "Table2",
+		Version: 1,
+		Name:    "Table2",
 		Columns: []sql.SQLTableColumn{
 			{Name: "Column1", Type: "timestamptz", IsNullable: true, Position: 1},
 			{Name: "Column2", Type: "varying character(10)", IsNullable: true, Position: 2},
@@ -69,9 +72,8 @@ var expectedSchemas map[string]entities.Schema = map[string]entities.Schema{
 		},
 	},
 	"Table3": &sql.SQLTable{
-		SchemaType: entities.SQLTable,
-		Version:    "1",
-		Name:       "Table2",
+		Version: 1,
+		Name:    "Table2",
 		Columns: []sql.SQLTableColumn{
 			{Name: "Column1", Type: "timestamptz", IsNullable: true, Position: 1},
 			{Name: "Column2", Type: "varying character(10)", IsNullable: true, Position: 2},
@@ -133,6 +135,15 @@ var expectedRecordBatch map[string][]RecordBatchInfo = map[string][]RecordBatchI
 	},
 }
 
+var expectedRoutines map[string]entities.Routine = map[string]entities.Routine{
+	"Function1":  &psql.PSQLFunction{Version: 1, Name: "Function1", Language: "pgplpsql", Volatility: pointers.Ptr("STATIC"), Parameters: pointers.Ptr("p1 string, p2 string"), ReturnType: "integer", Tag: "$$", Definition: "RETURN LEN(p1) + LEN(p2)"},
+	"Function2":  &psql.PSQLFunction{Version: 1, Name: "Function2", Language: "pgplpsql", Dependencies: []string{"Function1"}, Parameters: nil, ReturnType: "integer", Tag: "$$function$$", Definition: "RETURN Function1(test)"},
+	"Procedure1": &psql.PSQLProcedure{Version: 1, Name: "Procedure1", Language: "sql", Tag: "$$", Definition: "LOOP 1 TO 1000"},
+	"Procedure2": &psql.PSQLProcedure{Version: 1, Name: "Procedure2", Language: "sql", Dependencies: []string{"Procedure1"}, Parameters: pointers.Ptr("string, string"), Tag: "$$", Definition: "DO $1 - $2 AND Procedure1()"},
+	"Trigger1":   &psql.PSQLTrigger{Version: 1, Name: "Trigger1", Definition: "DO LOOP 1 TO 50 AND SUM(50, 20)"},
+	"Trigger2":   &psql.PSQLTrigger{Version: 1, Name: "Trigger2", Definition: "THIS IS THE SECOND TRIGGER DEFINITION"},
+}
+
 func TestBinaryBackup(t *testing.T) {
 	backupFactory := binary.NewBinaryBackupFactory("test")
 	assert.NotNil(t, backupFactory)
@@ -161,32 +172,32 @@ func TestBinaryBackup(t *testing.T) {
 		SchemaDependencies: make(map[string]string),
 		Schemas:            make(map[string]string),
 		Data:               make(map[string]entities.BackupSnapshotSchemaData),
+		Routines:           make(map[string]string),
 	}
 
 	dependenciesMap := map[string]SchemaDependecyInfo{
 		"Sequence1": {
-			dependency: &psql.PSQLSequence{DependencyType: entities.PSQLSequence, Version: "1", Name: "Sequence1", Type: "integer", Start: 1, Min: 1, Max: 1000, Increment: 1, IsCycle: false, LastValue: 20, IsCalled: false},
+			dependency: &psql.PSQLSequence{Version: 1, Name: "Sequence1", Type: "integer", Start: 1, Min: 1, Max: 1000, Increment: 1, IsCycle: false, LastValue: 20, IsCalled: false},
 		},
 		"Sequence2": {
-			dependency: &psql.PSQLSequence{DependencyType: entities.PSQLSequence, Version: "1", Name: "Sequence2", Type: "integer", Start: 20, Min: 2, Max: 100, Increment: 2, IsCycle: false, LastValue: 30, IsCalled: true},
+			dependency: &psql.PSQLSequence{Version: 1, Name: "Sequence2", Type: "integer", Start: 20, Min: 2, Max: 100, Increment: 2, IsCycle: false, LastValue: 30, IsCalled: true},
 			toDiff: []entities.SchemaDependency{
-				&psql.PSQLSequence{DependencyType: entities.PSQLSequence, Version: "1", Name: "Sequence2", Type: "integer", Start: 20, Min: 2, Max: 100, Increment: 2, IsCycle: false, LastValue: 40, IsCalled: true},
+				&psql.PSQLSequence{Version: 1, Name: "Sequence2", Type: "integer", Start: 20, Min: 2, Max: 100, Increment: 2, IsCycle: false, LastValue: 40, IsCalled: true},
 			},
 		},
 		"Sequence3": {
-			dependency: &psql.PSQLSequence{DependencyType: entities.PSQLSequence, Version: "1", Name: "Sequence3", Type: "integer", Start: 1, Min: 2, Max: 10000, Increment: 2, IsCycle: false, LastValue: 5, IsCalled: false},
+			dependency: &psql.PSQLSequence{Version: 1, Name: "Sequence3", Type: "integer", Start: 1, Min: 2, Max: 10000, Increment: 2, IsCycle: false, LastValue: 5, IsCalled: false},
 			toDiff: []entities.SchemaDependency{
-				&psql.PSQLSequence{DependencyType: entities.PSQLSequence, Version: "1", Name: "Sequence3", Type: "integer", Start: 1, Min: 2, Max: 10000, Increment: 3, IsCycle: false, LastValue: 10, IsCalled: true},
-				&psql.PSQLSequence{DependencyType: entities.PSQLSequence, Version: "1", Name: "Sequence3", Type: "integer", Start: 1, Min: 2, Max: 10000, Increment: 3, IsCycle: false, LastValue: 20, IsCalled: true},
+				&psql.PSQLSequence{Version: 1, Name: "Sequence3", Type: "integer", Start: 1, Min: 2, Max: 10000, Increment: 3, IsCycle: false, LastValue: 10, IsCalled: true},
+				&psql.PSQLSequence{Version: 1, Name: "Sequence3", Type: "integer", Start: 1, Min: 2, Max: 10000, Increment: 3, IsCycle: false, LastValue: 20, IsCalled: true},
 			},
 		},
 	}
 	schemasMap := map[string]SchemaInfo{
 		"Table1": {
 			schema: &sql.SQLTable{
-				SchemaType: entities.SQLTable,
-				Version:    "1",
-				Name:       "Table1",
+				Version: 1,
+				Name:    "Table1",
 				Columns: []sql.SQLTableColumn{
 					{Name: "Column1", Type: "integer", IsNullable: false, DefaultValue: pointers.Ptr("1"), Position: 1},
 					{Name: "Column2", Type: "varying character(10)", IsNullable: true, Position: 2},
@@ -198,9 +209,8 @@ func TestBinaryBackup(t *testing.T) {
 		},
 		"Table2": {
 			schema: &sql.SQLTable{
-				SchemaType: entities.SQLTable,
-				Version:    "1",
-				Name:       "Table2",
+				Version: 1,
+				Name:    "Table2",
 				Columns: []sql.SQLTableColumn{
 					{Name: "Column2", Type: "varying character(10)", IsNullable: true, Position: 1},
 					{Name: "Column3", Type: "bigint", IsNullable: true, Position: 2},
@@ -211,9 +221,8 @@ func TestBinaryBackup(t *testing.T) {
 			},
 			toDiff: []entities.Schema{
 				&sql.SQLTable{
-					SchemaType: entities.SQLTable,
-					Version:    "1",
-					Name:       "Table2",
+					Version: 1,
+					Name:    "Table2",
 					Columns: []sql.SQLTableColumn{
 						{Name: "Column1", Type: "timestamptz", IsNullable: true, Position: 1},
 						{Name: "Column2", Type: "varying character(10)", IsNullable: true, Position: 2},
@@ -233,9 +242,8 @@ func TestBinaryBackup(t *testing.T) {
 		},
 		"Table3": {
 			schema: &sql.SQLTable{
-				SchemaType: entities.SQLTable,
-				Version:    "1",
-				Name:       "Table2",
+				Version: 1,
+				Name:    "Table2",
 				Columns: []sql.SQLTableColumn{
 					{Name: "Column2", Type: "varying character(10)", IsNullable: true, Position: 1},
 					{Name: "Column3", Type: "bigint", IsNullable: true, Position: 2},
@@ -246,9 +254,8 @@ func TestBinaryBackup(t *testing.T) {
 			},
 			toDiff: []entities.Schema{
 				&sql.SQLTable{
-					SchemaType: entities.SQLTable,
-					Version:    "1",
-					Name:       "Table2",
+					Version: 1,
+					Name:    "Table2",
 					Columns: []sql.SQLTableColumn{
 						{Name: "Column1", Type: "timestamptz", IsNullable: true, Position: 1},
 						{Name: "Column2", Type: "varying character(10)", IsNullable: true, Position: 2},
@@ -265,9 +272,8 @@ func TestBinaryBackup(t *testing.T) {
 					},
 				},
 				&sql.SQLTable{
-					SchemaType: entities.SQLTable,
-					Version:    "1",
-					Name:       "Table2",
+					Version: 1,
+					Name:    "Table2",
 					Columns: []sql.SQLTableColumn{
 						{Name: "Column1", Type: "timestamptz", IsNullable: true, Position: 1},
 						{Name: "Column2", Type: "varying character(10)", IsNullable: true, Position: 2},
@@ -373,6 +379,44 @@ func TestBinaryBackup(t *testing.T) {
 			},
 		},
 	}
+	routinesMap := map[string]RoutineInfo{
+		"Function1": {
+			routine: &psql.PSQLFunction{Version: 1, Name: "Function1", Language: "sql", ReturnType: "integer", Tag: "$$", Definition: "RETURN 1"},
+			toDiff: []entities.Routine{
+				&psql.PSQLFunction{Version: 1, Name: "Function1", Language: "pgplpsql", Volatility: pointers.Ptr("STATIC"), Parameters: pointers.Ptr("p1 string, p2 string"), ReturnType: "integer", Tag: "$$", Definition: "RETURN LEN(p1) + LEN(p2)"},
+			},
+		},
+		"Function2": {
+			routine: &psql.PSQLFunction{Version: 1, Name: "Function2", Language: "sql", Parameters: pointers.Ptr("string, int"), ReturnType: "string", Tag: "$$", Definition: "RETURN $1"},
+			toDiff: []entities.Routine{
+				&psql.PSQLFunction{Version: 1, Name: "Function2", Language: "sql", Dependencies: []string{"Function1"}, Parameters: nil, ReturnType: "string", Tag: "$$", Definition: "RETURN string"},
+				&psql.PSQLFunction{Version: 1, Name: "Function2", Language: "pgplpsql", Dependencies: []string{"Function1"}, Parameters: nil, ReturnType: "integer", Tag: "$$function$$", Definition: "RETURN Function1(test)"},
+			},
+		},
+		"Procedure1": {
+			routine: &psql.PSQLProcedure{Version: 1, Name: "Procedure1", Language: "sql", Tag: "$$", Definition: "LOOP 1 TO 1000"},
+		},
+		"Procedure2": {
+			routine: &psql.PSQLProcedure{Version: 1, Name: "Procedure2", Language: "pgplpsql", Tag: "$$function$$", Definition: "LOOP 1 TO 50"},
+			toDiff: []entities.Routine{
+				&psql.PSQLProcedure{Version: 1, Name: "Procedure2", Language: "sql", Dependencies: []string{"Procedure1"}, Parameters: pointers.Ptr("string, string"), Tag: "$$", Definition: "DO $1 - $2 AND Procedure1()"},
+			},
+		},
+		"Trigger1": {
+			routine: &psql.PSQLTrigger{Version: 1, Name: "Trigger1", Definition: "STARTING TRIGGER"},
+			toDiff: []entities.Routine{
+				&psql.PSQLTrigger{Version: 1, Name: "Trigger1", Definition: "MIDDLE STEP TRIGGER"},
+				&psql.PSQLTrigger{Version: 1, Name: "Trigger1", Definition: "ALMOST FINAL VERSION"},
+				&psql.PSQLTrigger{Version: 1, Name: "Trigger1", Definition: "DO LOOP 1 TO 50 AND SUM(50, 20)"},
+			},
+		},
+		"Trigger2": {
+			routine: &psql.PSQLTrigger{Version: 1, Name: "Trigger2", Definition: "THIS IS THE SECOND"},
+			toDiff: []entities.Routine{
+				&psql.PSQLTrigger{Version: 1, Name: "Trigger2", Definition: "THIS IS THE SECOND TRIGGER DEFINITION"},
+			},
+		},
+	}
 
 	err = backupWriter.BeginSnapshot(&rollbackSnapshot)
 	assert.Nil(t, err)
@@ -464,6 +508,28 @@ func TestBinaryBackup(t *testing.T) {
 		}
 	}
 
+	for k, v := range routinesMap {
+		err = backupWriter.SaveRoutine(v.routine)
+		assert.Nil(t, err)
+
+		snapshot.Routines[k] = v.routine.Hash()
+		currentState := v.routine
+
+		for i, diffValue := range v.toDiff {
+			var isDiff bool = false
+			if i > 0 {
+				isDiff = true
+			}
+
+			diff := diffValue.Diff(currentState, isDiff)
+			err = backupWriter.SaveRoutineDiff(diff)
+			assert.Nil(t, err)
+
+			snapshot.Routines[k] = fmt.Sprintf("diffs/%s", diff.Hash())
+			currentState = diffValue
+		}
+	}
+
 	err = backupWriter.CommitSnapshot(&metadata)
 	assert.Nil(t, err)
 
@@ -507,6 +573,12 @@ func TestBinaryBackup(t *testing.T) {
 					assert.Equal(t, expectedRecordBatch[k][i].chunks[j], chunk)
 				}
 			}
+		}
+
+		for k, routine := range readSnapshot.Routines {
+			readRoutine, _, err := backupReader.GetRoutine(routine)
+			assert.Nil(t, err)
+			assert.Equal(t, expectedRoutines[k], readRoutine)
 		}
 	}
 

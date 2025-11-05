@@ -9,28 +9,26 @@ import (
 	"historydb/src/internal/utils/comparation"
 	"historydb/src/internal/utils/decode"
 	"historydb/src/internal/utils/encode"
+	"historydb/src/internal/utils/pointers"
 )
 
-const (
-	CURRENT_VERSION string = "1"
-)
+var PSQLSEQUENCE_VERSION int64 = 1
 
 type PSQLSequence struct {
-	DependencyType entities.DependencyType
-	Version        string
-	Name           string
-	Type           string
-	Start          int64
-	Min            int64
-	Max            int64
-	Increment      int64
-	IsCycle        bool
-	LastValue      int64
-	IsCalled       bool
+	Version   int64
+	Name      string
+	Type      string
+	Start     int64
+	Min       int64
+	Max       int64
+	Increment int64
+	IsCycle   bool
+	LastValue int64
+	IsCalled  bool
 }
 
 func (seq *PSQLSequence) GetDependencyType() entities.DependencyType {
-	return seq.DependencyType
+	return entities.PSQLSequence
 }
 
 func (seq *PSQLSequence) GetName() string {
@@ -99,11 +97,10 @@ func (seq *PSQLSequence) EncodeToBytes() []byte {
 func (seq *PSQLSequence) DecodeFromBytes(data []byte) error {
 	buf := bytes.NewBuffer(data)
 
-	dependencyType, err := decode.DecodeString(buf)
-	if err != nil {
+	if _, err := decode.DecodeString(buf); err != nil {
 		return err
 	}
-	version, err := decode.DecodeString(buf)
+	version, err := decode.DecodeInt(buf)
 	if err != nil {
 		return err
 	}
@@ -144,7 +141,6 @@ func (seq *PSQLSequence) DecodeFromBytes(data []byte) error {
 		return err
 	}
 
-	seq.DependencyType = entities.DependencyType(*dependencyType)
 	seq.Version = *version
 	seq.Name = *name
 	seq.Type = *typeData
@@ -161,8 +157,8 @@ func (seq *PSQLSequence) DecodeFromBytes(data []byte) error {
 func (seq *PSQLSequence) encodeData() []byte {
 	var buf bytes.Buffer
 
-	encode.EncodeString(&buf, (*string)(&seq.DependencyType))
-	encode.EncodeString(&buf, &seq.Version)
+	encode.EncodeString(&buf, (*string)(pointers.Ptr(entities.PSQLSequence)))
+	encode.EncodeInt(&buf, &PSQLSEQUENCE_VERSION)
 	encode.EncodeString(&buf, &seq.Name)
 	encode.EncodeString(&buf, &seq.Type)
 	encode.EncodeInt(&buf, &seq.Start)

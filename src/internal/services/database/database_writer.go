@@ -17,4 +17,5 @@ type DatabaseWriter interface {
 	SaveSchema(schema entities.Schema) error
 	SaveSchemaRules(schema entities.Schema) error
 	SaveSchemaRecords(schema entities.Schema, chunk entities.SchemaRecordChunk) error
+	SaveRoutine(routine entities.Routine) error
 }

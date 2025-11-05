@@ -21,6 +21,7 @@ type BackupSnapshot struct {
 	SchemaDependencies map[string]string
 	Schemas            map[string]string
 	Data               map[string]BackupSnapshotSchemaData
+	Routines           map[string]string
 }
 
 func (snapshot *BackupSnapshot) EncodeToBytes() []byte {
