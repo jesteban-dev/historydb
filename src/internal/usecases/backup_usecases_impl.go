@@ -74,6 +74,7 @@ func (uc *BackupUsecasesImpl) CreateSnapshot(first bool) *entities.BackupSnapsho
 		SchemaDependencies: make(map[string]string),
 		Schemas:            make(map[string]string),
 		Data:               make(map[string]entities.BackupSnapshotSchemaData),
+		Routines:           make(map[string]string),
 	}
 	if first {
 		if err := backupWriter.CreateBackupStructure(); err != nil {
@@ -552,5 +553,89 @@ func (uc *BackupUsecasesImpl) SnapshotSchemaRecords(lastSnapshot, snapshot *enti
 	fmt.Println("  - All schema records updated successfully")
 
 	snapshot.Data[schema.GetName()] = snapshotData
+	return true
+}
+
+func (uc *BackupUsecasesImpl) BackupRoutines(snapshot *entities.BackupSnapshot) bool {
+	dbReader := uc.dbFactory.CreateReader()
+	backupWriter := uc.backupFactory.CreateWriter()
+
+	// List routines from database
+	routines, err := dbReader.ListRoutines()
+	if err != nil {
+		uc.logger.Errorf("could not list routines from DB: %v\n", err)
+		return false
+	}
+
+	// Backup all routines
+	routineProgress := progressbar.NewOptions(len(routines), progressbar.OptionSetDescription(fmt.Sprintf("  + Saving all %d routines...", len(routines))), progressbar.OptionSetWidth(30), progressbar.OptionSetWriter(os.Stdout), progressbar.OptionSetRenderBlankState(true))
+	for _, routine := range routines {
+		hash := routine.Hash()
+
+		if err := backupWriter.SaveRoutine(routine); err != nil {
+			uc.logger.Errorf("could not save %s routine into backup: %v\n", routine.GetName(), err)
+			return false
+		}
+
+		snapshot.Routines[routine.GetName()] = hash
+		routineProgress.Add(1)
+	}
+
+	fmt.Println("  - All routines saved successfully")
+	return true
+}
+
+func (uc *BackupUsecasesImpl) SnapshotRoutines(lastSnapshot, snapshot *entities.BackupSnapshot) bool {
+	dbReader := uc.dbFactory.CreateReader()
+	backupReader := uc.backupFactory.CreateReader()
+	backupWriter := uc.backupFactory.CreateWriter()
+
+	// List routines from database
+	routines, err := dbReader.ListRoutines()
+	if err != nil {
+		uc.logger.Errorf("could not list routines from DB: %v\n", err)
+		return false
+	}
+
+	// Backup all routines
+	routineProgress := progressbar.NewOptions(len(routines), progressbar.OptionSetDescription(fmt.Sprintf("  + Saving all %d routines...", len(routines))), progressbar.OptionSetWidth(30), progressbar.OptionSetWriter(os.Stdout), progressbar.OptionSetRenderBlankState(true))
+	for _, routine := range routines {
+		hash := routine.Hash()
+
+		// If no condition it stays unmodified
+		prevHash, ok := lastSnapshot.Routines[routine.GetName()]
+		if !ok {
+			// New routine to write into backup
+			if err := backupWriter.SaveRoutine(routine); err != nil {
+				uc.logger.Errorf("could not save %s routine into backup: %v\n", routine.GetName(), err)
+				return false
+			}
+		} else if !crypto.CompareHashes(prevHash, hash) {
+			// Updates routine into backup
+			prevRoutine, isDiff, err := backupReader.GetRoutine(prevHash)
+			if err != nil {
+				if errors.Is(err, services.ErrBackupCorruptedFile) {
+					fmt.Printf("The %s routine in backup is corrupted\n", routine.GetName())
+				}
+
+				uc.logger.Errorf("could not read %s routine from backup: %v\n", routine.GetName(), err)
+				return false
+			}
+
+			routineDiff := routine.Diff(prevRoutine, isDiff)
+			if err := backupWriter.SaveRoutineDiff(routineDiff); err != nil {
+				uc.logger.Errorf("could not update %s routine into backup: %v\n", routine.GetName(), err)
+				return false
+			}
+
+			snapshot.Routines[routine.GetName()] = fmt.Sprintf("diffs/%s", hash)
+		} else {
+			snapshot.Schemas[routine.GetName()] = prevHash
+		}
+
+		routineProgress.Add(1)
+	}
+
+	fmt.Println("  - All routines updated successfully")
 	return true
 }

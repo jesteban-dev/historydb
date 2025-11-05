@@ -7,6 +7,7 @@ import (
 	"historydb/src/internal/services"
 	backup_services "historydb/src/internal/services/backup"
 	database_services "historydb/src/internal/services/database"
+	"historydb/src/internal/utils/types"
 	"os"
 	"time"
 
@@ -235,4 +236,67 @@ func (uc *RestoreUsecasesImpl) RestoreSchemaRecords(snapshot *entities.BackupSna
 
 	fmt.Println("  - All batches restored successfully")
 	return true
+}
+
+// Hay que incluir el orden de las dependencias
+func (uc *RestoreUsecasesImpl) RestoreRoutines(snapshot *entities.BackupSnapshot) bool {
+	backupReader := uc.backupFactory.CreateReader()
+	dbWriter := uc.dbFactory.CreateWriter()
+
+	restoredDependencies := []string{}
+	routineProgress := progressbar.NewOptions(len(snapshot.Routines), progressbar.OptionSetDescription(fmt.Sprintf("  + Restoring all %d routines...", len(snapshot.Routines))), progressbar.OptionSetWidth(30), progressbar.OptionSetWriter(os.Stdout), progressbar.OptionSetRenderBlankState(true))
+	for routineName, snapshotRoutine := range snapshot.Routines {
+		if ok := types.SeachInSlice(restoredDependencies, snapshotRoutine); !ok {
+			newRestoredDependencies, ok := uc.restoreSingleRoutine(snapshot, backupReader, dbWriter, routineName, snapshotRoutine)
+			if !ok {
+				return false
+			}
+
+			restoredDependencies = append(restoredDependencies, newRestoredDependencies...)
+			restoredDependencies = append(restoredDependencies, snapshotRoutine)
+
+			routineProgress.Add(len(newRestoredDependencies) + 1)
+		}
+	}
+
+	fmt.Println("  - All routines restored successfully")
+	return true
+}
+
+func (uc *RestoreUsecasesImpl) restoreSingleRoutine(snapshot *entities.BackupSnapshot, backupReader backup_services.BackupReader, dbWriter database_services.DatabaseWriter, routineName, routineRef string) ([]string, bool) {
+	restoredDependencies := []string{}
+
+	routine, _, err := backupReader.GetRoutine(routineRef)
+	if err != nil {
+		if errors.Is(err, services.ErrBackupCorruptedFile) {
+			fmt.Printf("The %s routine in backup is corrupted\n", routineName)
+		}
+
+		uc.logger.Errorf("could not read %s routine from backup: %v\n", routineName, err)
+		return nil, false
+	}
+
+	for _, dependency := range routine.GetDependencies() {
+		snapshotDependency, ok := snapshot.Routines[dependency]
+		if !ok {
+			uc.logger.Errorf("could not find %s routine in backup\n", dependency)
+			return nil, false
+		}
+
+		if ok := types.SeachInSlice(restoredDependencies, snapshotDependency); !ok {
+			newRestoredDependencies, ok := uc.restoreSingleRoutine(snapshot, backupReader, dbWriter, dependency, snapshotDependency)
+			if !ok {
+				return nil, false
+			}
+			restoredDependencies = append(restoredDependencies, newRestoredDependencies...)
+			restoredDependencies = append(restoredDependencies, snapshotDependency)
+		}
+	}
+
+	if err := dbWriter.SaveRoutine(routine); err != nil {
+		uc.logger.Errorf("could not restore %s routine: %v\n", routineName, err)
+		return nil, false
+	}
+
+	return restoredDependencies, true
 }

@@ -28,6 +28,10 @@ func (trigger *PSQLTrigger) GetRoutineType() entities.RoutineType {
 	return entities.PSQLTrigger
 }
 
+func (trigger *PSQLTrigger) GetDependencies() []string {
+	return nil
+}
+
 func (trigger *PSQLTrigger) Hash() string {
 	hash := sha256.Sum256(trigger.encodeData())
 	return hex.EncodeToString(hash[:])

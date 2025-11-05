@@ -37,6 +37,11 @@ func (handler *BackupHandler) CreateBackup() {
 		}
 	}
 
+	if ok := handler.backupUc.BackupRoutines(snapshot); !ok {
+		handler.backupUc.RollbackSnapshot(true)
+		return
+	}
+
 	if ok := handler.backupUc.CommitSnapshot(nil, snapshot); !ok {
 		handler.backupUc.RollbackSnapshot(true)
 	}
@@ -81,6 +86,11 @@ func (handler *BackupHandler) SnapshotBackup() {
 				return
 			}
 		}
+	}
+
+	if ok := handler.backupUc.SnapshotRoutines(lastSnapshot, newSnapshot); !ok {
+		handler.backupUc.RollbackSnapshot(false)
+		return
 	}
 
 	if ok := handler.backupUc.CommitSnapshot(backupMetadata, newSnapshot); !ok {

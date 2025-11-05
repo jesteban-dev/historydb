@@ -45,6 +45,11 @@ func (handler *RestoreHanlder) RestoreDatabase(snapshotId *string) {
 		return
 	}
 
+	if ok := handler.restoreUc.RestoreRoutines(snapshot); !ok {
+		handler.restoreUc.RollbackDatabaseRestore()
+		return
+	}
+
 	if ok := handler.restoreUc.CommitDatabaseRestore(); !ok {
 		handler.restoreUc.RollbackDatabaseRestore()
 	}
