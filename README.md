@@ -40,7 +40,7 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/username/project.git
+git clone https://github.com/jesteban-dev/historydb
 cd project
 
 # Build and install the application
