@@ -6,7 +6,10 @@ import (
 	"historydb/src/internal/entities"
 	"historydb/src/internal/services/entities/psql"
 	sql_entities "historydb/src/internal/services/entities/sql"
+	"historydb/src/internal/services/utils"
+	"historydb/src/internal/utils/types"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/lib/pq"
@@ -131,6 +134,118 @@ func (reader *PSQLDatabaseReader) GetSchemaDefinition(schemaName string) (entiti
 		ForeignKeys: foreignKeys,
 		Indexes:     indexes,
 	}, nil
+}
+
+func (reader *PSQLDatabaseReader) GetSchemaRecordMetadata(schemaName string) (entities.SchemaRecordMetadata, error) {
+	metadata := entities.SchemaRecordMetadata{}
+	tableSchema, tableName := reader.parseTableName(schemaName)
+
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM %s.%s", pq.QuoteIdentifier(tableSchema), pq.QuoteIdentifier(tableName))
+	if err := reader.db.QueryRow(countQuery).Scan(&metadata.Count); err != nil {
+		return metadata, err
+	}
+
+	sizeQuery := fmt.Sprintf("SELECT COALESCE(MAX(pg_column_size(t)), 0) AS max_row_size FROM %s.%s AS t", pq.QuoteIdentifier(tableSchema), pq.QuoteIdentifier(tableName))
+	if err := reader.db.QueryRow(sizeQuery).Scan(&metadata.MaxRecordSize); err != nil {
+		return metadata, err
+	}
+
+	return metadata, nil
+}
+
+func (reader *PSQLDatabaseReader) GetSchemaRecordChunk(schema entities.Schema, chunkSize int, chunkCursor interface{}) (entities.SchemaRecordChunk, interface{}, error) {
+	table := schema.(*sql_entities.SQLTable)
+	tableSchema, tableName := reader.parseTableName(table.Name)
+
+	cursor, ok := chunkCursor.(*sql_entities.SQLChunkCursor)
+	if !ok || cursor == nil {
+		cursor = &sql_entities.SQLChunkCursor{}
+	}
+
+	var rows *sql.Rows
+	var err error
+	pKeys, ok := utils.ExtractPrimaryKey(*table)
+	if !ok {
+		// If table does not have primary keys, it queries the table using offset
+		query := fmt.Sprintf("SELECT * FROM %s.%s ORDER BY ctid LIMIT $1 OFFSET $2", pq.QuoteIdentifier(tableSchema), pq.QuoteIdentifier(tableName))
+		rows, err = reader.db.Query(query, chunkSize, cursor.Offset)
+	} else {
+		// If table has primary keys, it queries the table using the for optimization
+		orderClause := fmt.Sprintf("ORDER BY %s", strings.Join(utils.QuoteIdentifiers(pKeys), ", "))
+
+		if cursor.LastPK == nil {
+			// No where clause since it is first chunk
+			query := fmt.Sprintf("SELECT * FROM %s.%s %s LIMIT $1", pq.QuoteIdentifier(tableSchema), pq.QuoteIdentifier(tableName), orderClause)
+			rows, err = reader.db.Query(query, chunkSize)
+		} else {
+			whereClause := utils.BuildPKWhereClause(pKeys, cursor.LastPK)
+			query := fmt.Sprintf("SELECT * FROM %s.%s WHERE %s %s LIMIT $%d", pq.QuoteIdentifier(tableSchema), pq.QuoteIdentifier(tableName), whereClause, orderClause, len(pKeys)+1)
+			args := append(types.ToInterfaceSlice(cursor.LastPK), chunkSize)
+			rows, err = reader.db.Query(query, args...)
+		}
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+
+	numCols := len(table.Columns)
+	var lastPKey []interface{} = nil
+	if pKeys != nil {
+		lastPKey = make([]interface{}, len(pKeys))
+	}
+
+	results := make([]sql_entities.SQLRecord, 0, chunkSize)
+	for rows.Next() {
+		values := make([]interface{}, numCols)
+		valuesPtrs := make([]interface{}, numCols)
+		for i := range values {
+			valuesPtrs[i] = &values[i]
+		}
+
+		if err := rows.Scan(valuesPtrs...); err != nil {
+			return nil, nil, err
+		}
+
+		// Save data in SQLRecord
+		row := sql_entities.SQLRecord{}
+		for i, col := range table.Columns {
+			var val interface{}
+			raw := values[i]
+
+			b, ok := raw.([]byte)
+			if ok {
+				if col.Type == "bytea" {
+					val = b
+				} else if strings.HasPrefix(col.Type, "numeric") {
+					val, _ = strconv.ParseFloat(string(b), 64)
+				} else {
+					val = string(b)
+				}
+			} else {
+				val = raw
+			}
+
+			row[col.Name] = val
+		}
+
+		// Update lastPK
+		for i, key := range pKeys {
+			for k, v := range row {
+				if key == k {
+					lastPKey[i] = v
+				}
+			}
+		}
+
+		results = append(results, row)
+	}
+
+	cursor.Offset += chunkSize
+	cursor.LastPK = lastPKey
+	return &sql_entities.SQLRecordChunk{
+		Content: results,
+	}, cursor, nil
 }
 
 // As PSQL has schemes and our Schema names for this language is composed as <scheme-name>.<table-name>,
