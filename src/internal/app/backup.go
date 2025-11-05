@@ -93,6 +93,6 @@ func printBackupHelp() {
 	fmt.Println("  create \tIt creates a new backup from a database")
 	fmt.Println("  snapshot \tIt snapshots the current state of the database into the already created backup")
 	fmt.Println("Options:")
-	fmt.Println("  --connString \tDatabase connection string")
+	fmt.Println("  --connString \tDatabase connection string from where to back-up the data")
 	fmt.Println("  --path \tPath where the backup is located, or where it will be created")
 }

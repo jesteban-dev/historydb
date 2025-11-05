@@ -22,14 +22,9 @@ func (factory *PSQLDatabaseFactory) CreateReader() services.DatabaseReader {
 }
 
 func (factory *PSQLDatabaseFactory) GetDBMetadata() entities.BackupDatabase {
-	return entities.BackupDatabase{
-		Engine: "postgres",
-		Host:   factory.host,
-		Port:   factory.port,
-		DbName: factory.dbName,
-	}
+	return entities.BackupDatabase{Engine: "postgres"}
 }
 
 func (factory *PSQLDatabaseFactory) CheckBackupDB(db entities.BackupDatabase) bool {
-	return db.Engine == "postgres" && db.Host == factory.host && db.Port == factory.port && db.DbName == factory.dbName
+	return db.Engine == "postgres"
 }
