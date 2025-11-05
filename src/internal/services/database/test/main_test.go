@@ -2,24 +2,11 @@ package test
 
 import (
 	"fmt"
-	"historydb/src/internal/services/entities"
 	"log"
 	"net/url"
 	"strings"
 	"testing"
 )
-
-type DBSQLTestContent struct {
-	DBName       string
-	Tables       []entities.SQLTable
-	TableContent map[string]DBSQLTableContent
-}
-
-type DBSQLTableContent struct {
-	DataLength int
-	ChunkSize  int
-	Rows       []entities.TableRow
-}
 
 var dbCases = []string{"postgres"}
 
@@ -29,12 +16,12 @@ func TestMain(t *testing.T) {
 		case "postgres":
 			runPSQLReaderTests(t)
 		default:
-			log.Fatalf("Unsupported DB: %s", dbType)
+			log.Fatalf("unsupported DB: %s", dbType)
 		}
 	}
 }
 
-func parseDbUrl(dbUrl string) (string, error) {
+func parseDatabaseURL(dbUrl string) (string, error) {
 	dbUrl = strings.TrimSuffix(dbUrl, "?")
 
 	u, err := url.Parse(dbUrl)

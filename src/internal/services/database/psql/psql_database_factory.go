@@ -1,9 +1,8 @@
-package database_impl
+package psql
 
 import (
 	"database/sql"
-	"historydb/src/internal/entities"
-	"historydb/src/internal/services"
+	services "historydb/src/internal/services/database"
 )
 
 type PSQLDatabaseFactory struct {
@@ -22,10 +21,10 @@ func (factory *PSQLDatabaseFactory) CreateWriter() services.DatabaseWriter {
 	return NewPSQLDatabaseWriter(factory.db)
 }
 
-func (factory *PSQLDatabaseFactory) GetDBMetadata() entities.BackupDatabase {
-	return entities.BackupDatabase{Engine: "postgres"}
+func (factory *PSQLDatabaseFactory) GetDBEngine() string {
+	return "postgres"
 }
 
-func (factory *PSQLDatabaseFactory) CheckBackupDB(db entities.BackupDatabase) bool {
-	return db.Engine == "postgres"
+func (factory *PSQLDatabaseFactory) CheckBackupDB(engine string) bool {
+	return engine == "postgres"
 }
