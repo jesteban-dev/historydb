@@ -3,6 +3,7 @@ package app
 import (
 	"flag"
 	"fmt"
+	"historydb/src/internal/handlers"
 	"historydb/src/internal/usecases"
 	"net/url"
 	"os"
@@ -45,13 +46,15 @@ func BackupApp(args []string) {
 	dbFactory := createDatabaseFactory(engine, db)
 	backupFactory := createBackupFactory(*basePath)
 
-	backupUsecases := usecases.NewBackupUsecases(dbFactory, backupFactory, logger)
+	backupUsecases := usecases.NewBackupUsecasesImpl(dbFactory, backupFactory, logger)
+
+	backupHandler := handlers.NewBackupHandler(backupUsecases)
 
 	switch action {
 	case "create":
-		backupUsecases.CreateBackup()
+		backupHandler.CreateBackup()
 	case "snapshot":
-		backupUsecases.SnapshotBackup()
+		backupHandler.SnapshotBackup()
 	}
 }
 
