@@ -249,8 +249,9 @@ func (idx1 SQLTableIndex) equal(idx2 SQLTableIndex) bool {
 }
 
 type TableRowChunk struct {
-	HashValue string     `json:"hash"`
-	Content   []TableRow `json:"content"`
+	SchemaType SchemaType `json:"schemaType"`
+	HashValue  string     `json:"hash"`
+	Content    []TableRow `json:"content"`
 }
 
 func (chunk *TableRowChunk) Hash() (string, error) {
@@ -285,6 +286,65 @@ func (chunk *TableRowChunk) Length() int {
 	return len(chunk.Content)
 }
 
+func (chunk *TableRowChunk) findTableRowIndex(hash string) int {
+	for idx, row := range chunk.Content {
+		if helpers.CompareHashes(row.HashValue, hash) {
+			return idx
+		}
+	}
+	return -1
+}
+
+func (chunk *TableRowChunk) Diff(chunkCompare entities.SchemaDataChunk) entities.SchemaDataChunkDiff {
+	// Hacer Diff a partir de 2 chunk
+	diff := TableRowDiff{SchemaType: Relational}
+	oldChunk := chunkCompare.(*TableRowChunk)
+
+	diff.HashValue = &chunk.HashValue
+	diff.PrevRef = &oldChunk.HashValue
+	diff.Data = []ColumnValue{} // how to diff content
+
+	return diff
+}
+
+func (chunk *TableRowChunk) ApplyDiff(diff entities.SchemaDataChunkDiff) entities.SchemaDataChunk {
+	updatedChunk := *chunk
+	chunkDiff := diff.(*TableRowChunkDiff)
+
+	updatedChunk.Content = make([]TableRow, 0, len(chunk.Content)+len(chunk.Content))
+	for _, tableRow := range chunkDiff.Content {
+		if tableRow.PrevRef != nil {
+			idx := updatedChunk.findTableRowIndex(*tableRow.PrevRef)
+			if idx == -1 {
+				return nil
+			}
+
+			if tableRow.HashValue != nil { // Substitute content
+				updatedChunk.Content[idx] = TableRow{
+					HashValue: *tableRow.HashValue,
+					Data:      tableRow.Data,
+				}
+			} else { // Remove row
+				updatedChunk.Content = append(updatedChunk.Content[:idx], updatedChunk.Content[idx+1:]...)
+			}
+		} else { // Add row
+			updatedChunk.Content = append(updatedChunk.Content, TableRow{
+				HashValue: *tableRow.HashValue,
+				Data:      tableRow.Data,
+			})
+		}
+	}
+
+	return &updatedChunk
+}
+
+type TableRowChunkDiff struct {
+	SchemaType SchemaType            `json:"schemaType"`
+	Hash       *string               `json:"hash"`
+	PrevRef    *JSONDataChunkPrevRef `json:"prevRef"`
+	Content    []TableRowDiff        `json:"content"`
+}
+
 // TableRow is the struct used in SQL languages to save a table row data.
 type TableRow struct {
 	HashValue string        `json:"hash"`
@@ -314,6 +374,13 @@ func (row *TableRow) Hash() (string, error) {
 	}
 
 	return row.HashValue, nil
+}
+
+type TableRowDiff struct {
+	SchemaType SchemaType    `json:"schemaType"`
+	HashValue  *string       `json:"hash"`
+	PrevRef    *string       `json:"prevRef"`
+	Data       []ColumnValue `json:"data"`
 }
 
 // SQLChunkCursor is the struct used in SQL languages to chunk the data queries in a table.

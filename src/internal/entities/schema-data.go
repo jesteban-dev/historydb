@@ -10,7 +10,11 @@ type SchemaDataChunk interface {
 	Hash() (string, error)
 	HashContent() error
 	Length() int
+	Diff(chunk SchemaDataChunk) SchemaDataChunkDiff
+	ApplyDiff(diff SchemaDataChunkDiff) SchemaDataChunk
 }
+
+type SchemaDataChunkDiff interface{}
 
 // SchemaData is an interface that represents a single data/row inside a database scheme.
 type SchemaData interface {

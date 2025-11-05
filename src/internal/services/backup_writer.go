@@ -17,6 +17,7 @@ type BackupWriter interface {
 	WriteSchema(tempPath string, schema entities.Schema) error
 	WriteSchemaDiff(tempPath string, schemaDiff entities.SchemaDiff) error
 	WriteSchemaDataChunk(tempPath, tempFile string, chunk entities.SchemaDataChunk) error
+	WriteSchemaDataChunkDiff(tempPath, tempFile string, chunk entities.SchemaDataChunkDiff) error
 	WriteSchemaDataBatch(tempPath, tempFile, filename string) error
 	CommitSnapshot(tempPath string, metadata entities.BackupMetadata) error
 	RollbackSnapshot(tempPath string) error
