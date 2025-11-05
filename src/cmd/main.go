@@ -7,7 +7,10 @@ import (
 	"os"
 )
 
+var version string
+
 func main() {
+	fmt.Println("historydb version:", version)
 	if len(os.Args) < 2 {
 		printRootHelp()
 		return
