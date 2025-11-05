@@ -2,7 +2,7 @@ package utils
 
 import (
 	"fmt"
-	"historydb/src/internal/services/database_impl/entities"
+	"historydb/src/internal/services/entities"
 	"strings"
 
 	"github.com/lib/pq"

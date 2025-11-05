@@ -30,8 +30,8 @@ type PSQLArgument struct {
 type RoutineType string
 
 const (
-	RoutineTypeFunction  RoutineType = "f"
-	RoutineTypeProcedure RoutineType = "p"
+	FUNCTION  RoutineType = "f"
+	PROCEDURE RoutineType = "p"
 )
 
 // PSQLRoutine is the struct used to represent all data relative to a PostgreSQL routine.
