@@ -12,4 +12,6 @@ type BackupReader interface {
 	GetBackupSnapshot(snapshotId string) (entities.BackupSnapshot, error)
 	GetSchemaDependency(dependencyRef string) (entities.SchemaDependency, bool, error)
 	GetSchema(filename string) (entities.Schema, bool, error)
+	GetSchemaRecordChunkRefsInBatch(batchRef string) ([]string, error)
+	GetSchemaRecordChunk(batchRef, chunkRef string) (entities.SchemaRecordChunk, bool, error)
 }

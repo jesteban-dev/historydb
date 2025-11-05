@@ -1,10 +1,13 @@
 package binary
 
 import (
+	"bytes"
 	"fmt"
 	"historydb/src/internal/entities"
 	"historydb/src/internal/services"
 	"historydb/src/internal/services/backup/base"
+	"historydb/src/internal/utils/encode"
+	"historydb/src/internal/utils/pointers"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -132,4 +135,79 @@ func (writer *BinaryBackupWriter) SaveSchemaDiff(diff entities.SchemaDiff) error
 	}
 
 	return os.WriteFile(pathToFile, content, 0644)
+}
+
+func (writer *BinaryBackupWriter) SaveSchemaRecordChunk(batchRef string, recordType entities.RecordType, chunk entities.SchemaRecordChunk) error {
+	if writer.TxSnapshot == nil {
+		return services.ErrBackupTransactionNotFound
+	}
+
+	pathToFile := filepath.Join(writer.BackupPath, writer.TxSnapshot.SnapshotId, "data", fmt.Sprintf("%s.hdb", batchRef))
+	if err := os.MkdirAll(filepath.Dir(pathToFile), 0755); err != nil {
+		return err
+	}
+
+	f, err := os.OpenFile(pathToFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	// If batch is new, it writes the record type
+	info, err := f.Stat()
+	if err != nil {
+		return err
+	}
+	if info.Size() == 0 {
+		var recordTypeBytes bytes.Buffer
+		encode.EncodeString(&recordTypeBytes, pointers.Ptr(string(recordType)))
+		f.Write(recordTypeBytes.Bytes())
+	}
+
+	content := chunk.EncodeToBytes()
+	_, err = f.Write(content)
+	return err
+}
+
+func (writer *BinaryBackupWriter) SaveSchemaRecordChunkDiff(prevBatchRef, batchRef string, recordType entities.RecordType, chunk entities.SchemaRecordChunkDiff) error {
+	if writer.TxSnapshot == nil {
+		return services.ErrBackupTransactionNotFound
+	}
+
+	pathToFile := filepath.Join(writer.BackupPath, writer.TxSnapshot.SnapshotId, "data", fmt.Sprintf("%s.hdb", batchRef))
+	if err := os.MkdirAll(filepath.Dir(pathToFile), 0755); err != nil {
+		return err
+	}
+
+	f, err := os.OpenFile(pathToFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	// If batch is new, it writes the record type and prevBatchRef
+	info, err := f.Stat()
+	if err != nil {
+		return err
+	}
+	if info.Size() == 0 {
+		var batchInit bytes.Buffer
+		encode.EncodeString(&batchInit, pointers.Ptr(string(recordType)))
+		encode.EncodeString(&batchInit, pointers.Ptr(prevBatchRef))
+		f.Write(batchInit.Bytes())
+	}
+
+	content := chunk.EncodeToBytes()
+	_, err = f.Write(content)
+	return err
+}
+
+func (writer *BinaryBackupWriter) SaveSchemaRecordBatch(batchTempRef, batchRef string) error {
+	if writer.TxSnapshot == nil {
+		return services.ErrBackupTransactionNotFound
+	}
+
+	oldPath := filepath.Join(writer.BackupPath, writer.TxSnapshot.SnapshotId, "data", fmt.Sprintf("%s.hdb", batchTempRef))
+	newPath := filepath.Join(writer.BackupPath, writer.TxSnapshot.SnapshotId, "data", fmt.Sprintf("%s.hdb", batchRef))
+	return os.Rename(oldPath, newPath)
 }

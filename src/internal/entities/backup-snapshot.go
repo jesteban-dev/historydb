@@ -20,7 +20,7 @@ type BackupSnapshot struct {
 	SnapshotId         string
 	SchemaDependencies map[string]string
 	Schemas            map[string]string
-	//Data               map[string]BackupSnapshotSchemaData `json:"data"`
+	Data               map[string]BackupSnapshotSchemaData
 }
 
 func (snapshot *BackupSnapshot) EncodeToBytes() []byte {
@@ -45,12 +45,16 @@ func (snapshot *BackupSnapshot) encodeData() []byte {
 	if len(snapshot.Schemas) > 0 {
 		flags |= 1 << 1
 	}
+	if len(snapshot.Data) > 0 {
+		flags |= 1 << 2
+	}
 
 	buf.WriteByte(flags)
 	encode.EncodeTime(&buf, &snapshot.Timestamp)
 	encode.EncodeString(&buf, &snapshot.SnapshotId)
 	encode.EncodeMap(&buf, types.ToInterfaceMap(snapshot.SchemaDependencies))
 	encode.EncodeMap(&buf, types.ToInterfaceMap(snapshot.Schemas))
+	encode.EncodeStructMap(&buf, snapshot.Data)
 
 	return buf.Bytes()
 }
@@ -94,11 +98,23 @@ func (snapshot *BackupSnapshot) DecodeFromBytes(data []byte) error {
 			return err
 		}
 	}
+	dataMap := make(map[string]BackupSnapshotSchemaData)
+	if flags&(1<<2) != 0 {
+		schemaData, err := decode.DecodeStructMap[*BackupSnapshotSchemaData](buf)
+		if err != nil {
+			return err
+		}
+
+		for k, v := range schemaData {
+			dataMap[k] = *v
+		}
+	}
 
 	snapshot.Timestamp = *timestamp
 	snapshot.SnapshotId = *snapshotId
 	snapshot.SchemaDependencies = schemaDependenciesMap
 	snapshot.Schemas = schemasMap
+	snapshot.Data = dataMap
 	return nil
 }
 
@@ -108,8 +124,41 @@ func (snapshot *BackupSnapshot) DecodeFromBytes(data []byte) error {
 // BatchSize -> The max-size for all batches used to save the schema data.
 // ChunkSize -> The max-size for all chunks used to save the schema data.
 // Data -> A string of paths that represents all the batch files needed to rebuild the schema data.
-/*type BackupSnapshotSchemaData struct {
-	BatchSize int      `json:"batchSize"`
-	ChunkSize int      `json:"chunkSize"`
-	Data      []string `json:"data"`
-}*/
+type BackupSnapshotSchemaData struct {
+	BatchSize int
+	ChunkSize int
+	Data      []string
+}
+
+func (schemaData BackupSnapshotSchemaData) EncodeToBytes() []byte {
+	var buf bytes.Buffer
+
+	encode.EncodeInt(&buf, &schemaData.BatchSize)
+	encode.EncodeInt(&buf, &schemaData.ChunkSize)
+	encode.EncodePrimitiveSlice(&buf, schemaData.Data)
+
+	return buf.Bytes()
+}
+
+func (schemaData *BackupSnapshotSchemaData) DecodeFromBytes(data []byte) (*BackupSnapshotSchemaData, error) {
+	buf := bytes.NewBuffer(data)
+
+	batchSize, err := decode.DecodeInt(buf)
+	if err != nil {
+		return nil, err
+	}
+	chunkSize, err := decode.DecodeInt(buf)
+	if err != nil {
+		return nil, err
+	}
+	dataSlice, err := decode.DecodePrimitiveSlice[string](buf)
+	if err != nil {
+		return nil, err
+	}
+
+	return &BackupSnapshotSchemaData{
+		BatchSize: *batchSize,
+		ChunkSize: *chunkSize,
+		Data:      dataSlice,
+	}, nil
+}

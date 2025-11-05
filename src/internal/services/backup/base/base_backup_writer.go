@@ -34,7 +34,15 @@ func (writer *BaseBackupWriter) CreateBackupStructure() error {
 	if err := os.Mkdir(filepath.Join(writer.BackupPath, "schemas", "dependencies"), 0755); err != nil {
 		return err
 	}
-	return os.Mkdir(filepath.Join(writer.BackupPath, "schemas", "dependencies", "diffs"), 0755)
+	if err := os.Mkdir(filepath.Join(writer.BackupPath, "schemas", "dependencies", "diffs"), 0755); err != nil {
+		return err
+	}
+
+	if err := os.Mkdir(filepath.Join(writer.BackupPath, "data"), 0755); err != nil {
+		return err
+	}
+
+	return os.Mkdir(filepath.Join(writer.BackupPath, "data", "diffs"), 0755)
 }
 
 func (writer *BaseBackupWriter) DeleteBackupStructure() error {

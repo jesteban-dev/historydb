@@ -3,6 +3,7 @@ package binary
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 	"historydb/src/internal/entities"
 	"historydb/src/internal/services"
@@ -10,6 +11,7 @@ import (
 	"historydb/src/internal/services/entities/sql"
 	"historydb/src/internal/utils/crypto"
 	"historydb/src/internal/utils/decode"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -169,6 +171,104 @@ func (reader *BinaryBackupReader) GetSchema(filename string) (entities.Schema, b
 	}
 }
 
+func (reader *BinaryBackupReader) GetSchemaRecordChunkRefsInBatch(batchRef string) ([]string, error) {
+	pathToFile := filepath.Join(reader.backupPath, "data", fmt.Sprintf("%s.hdb", batchRef))
+	f, err := os.Open(pathToFile)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	// Gets record type
+	var recordTypeLength int64
+	if err = binary.Read(f, binary.LittleEndian, &recordTypeLength); err != nil {
+		return nil, err
+	}
+	recordType := make([]byte, recordTypeLength)
+	if _, err := io.ReadFull(f, recordType); err != nil {
+		return nil, err
+	}
+
+	if strings.HasPrefix(batchRef, "diffs") {
+		// Gets prevBatchRef
+		var prevBatchRefLength int64
+		if err := binary.Read(f, binary.LittleEndian, &prevBatchRefLength); err != nil {
+			return nil, err
+		}
+		prevBatchRef := make([]byte, prevBatchRefLength)
+		if _, err := io.ReadFull(f, prevBatchRef); err != nil {
+			return nil, err
+		}
+
+		chunkRefs, err := reader.GetSchemaRecordChunkRefsInBatch(string(prevBatchRef))
+		if err != nil {
+			return nil, err
+		}
+
+		return reader.readSchemaChunkRefsDiffByType(entities.RecordType(recordType), f, chunkRefs)
+	} else {
+		return reader.readSchemaChunkRefsByType(entities.RecordType(recordType), f)
+	}
+}
+
+func (reader *BinaryBackupReader) GetSchemaRecordChunk(batchRef, chunkRef string) (entities.SchemaRecordChunk, bool, error) {
+	pathToFile := filepath.Join(reader.backupPath, "data", fmt.Sprintf("%s.hdb", batchRef))
+	f, err := os.Open(pathToFile)
+	if err != nil {
+		return nil, false, err
+	}
+	defer f.Close()
+
+	// Gets record type
+	var recordTypeLength int64
+	if err = binary.Read(f, binary.LittleEndian, &recordTypeLength); err != nil {
+		return nil, false, err
+	}
+	recordType := make([]byte, recordTypeLength)
+	if _, err := io.ReadFull(f, recordType); err != nil {
+		return nil, false, err
+	}
+
+	if strings.HasPrefix(batchRef, "diffs") {
+		// Gets prevBatchRef
+		var prevBatchRefLength int64
+		if err := binary.Read(f, binary.LittleEndian, &prevBatchRefLength); err != nil {
+			return nil, false, err
+		}
+		prevBatchRef := make([]byte, prevBatchRefLength)
+		if _, err := io.ReadFull(f, prevBatchRef); err != nil {
+			return nil, false, err
+		}
+
+		diff, err := reader.readSchemaDataChunkDiffByType(entities.RecordType(recordType), chunkRef, f)
+		if err != nil {
+			return nil, false, err
+		}
+
+		if diff.GetPrevRef() != nil {
+			chunk, _, err := reader.GetSchemaRecordChunk(string(prevBatchRef), *diff.GetPrevRef())
+			if err != nil {
+				return nil, false, err
+			}
+
+			chunk = chunk.ApplyDiff(diff)
+			if chunk == nil {
+				return nil, false, services.ErrBackupCorruptedFile
+			}
+			return chunk, true, nil
+		}
+
+		chunk := diff.ApplyDiffFromEmpty()
+		if chunk == nil {
+			return nil, false, services.ErrBackupCorruptedFile
+		}
+		return chunk, true, nil
+	} else {
+		chunk, err := reader.readSchemaRecordChunkByType(entities.RecordType(recordType), chunkRef, f)
+		return chunk, false, err
+	}
+}
+
 func (reader *BinaryBackupReader) readSchemaDependencyByType(dependencyType entities.DependencyType, content []byte) (entities.SchemaDependency, error) {
 	switch dependencyType {
 	case entities.PSQLSequence:
@@ -219,5 +319,139 @@ func (reader *BinaryBackupReader) readSchemaDiffByType(schemaType entities.Schem
 		return &diff, nil
 	default:
 		return nil, services.ErrSchemaNotSupported
+	}
+}
+
+func (reader *BinaryBackupReader) readSchemaChunkRefsByType(recordType entities.RecordType, f *os.File) ([]string, error) {
+	chunkRefs := []string{}
+
+	switch recordType {
+	case entities.SQLRecord:
+		for {
+			var chunkLength int64
+			if err := binary.Read(f, binary.LittleEndian, &chunkLength); err == io.EOF || err == io.ErrUnexpectedEOF {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			chunkBytes := make([]byte, chunkLength)
+			if _, err := io.ReadFull(f, chunkBytes); err != nil {
+				return nil, err
+			}
+
+			chunkHash, err := decode.DecodeString(bytes.NewBuffer(chunkBytes))
+			if err != nil {
+				return nil, err
+			}
+
+			chunkRefs = append(chunkRefs, *chunkHash)
+		}
+
+		return chunkRefs, nil
+	default:
+		return nil, services.ErrRecordNotSupported
+	}
+}
+
+func (reader *BinaryBackupReader) readSchemaChunkRefsDiffByType(recordType entities.RecordType, f *os.File, originalChunks []string) ([]string, error) {
+	switch recordType {
+	case entities.SQLRecord:
+		for {
+			var chunkLength int64
+			if err := binary.Read(f, binary.LittleEndian, &chunkLength); err == io.EOF || err == io.ErrUnexpectedEOF {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			chunkBytes := make([]byte, chunkLength)
+			if _, err := io.ReadFull(f, chunkBytes); err != nil {
+				return nil, err
+			}
+
+			var diff sql.SQLRecordChunkDiff
+			if err := diff.DecodeFromBytes(chunkBytes); err != nil {
+				return nil, err
+			}
+
+			if diff.PrevRef == nil {
+				originalChunks = append(originalChunks, *diff.Hash())
+			} else {
+				for i, v := range originalChunks {
+					if v == *diff.PrevRef {
+						originalChunks[i] = *diff.Hash()
+					}
+				}
+			}
+		}
+
+		return originalChunks, nil
+	default:
+		return nil, services.ErrRecordNotSupported
+	}
+}
+
+func (reader *BinaryBackupReader) readSchemaRecordChunkByType(recordType entities.RecordType, chunkRef string, f *os.File) (entities.SchemaRecordChunk, error) {
+	switch recordType {
+	case entities.SQLRecord:
+		for {
+			var chunkLength int64
+			if err := binary.Read(f, binary.LittleEndian, &chunkLength); err == io.EOF || err == io.ErrUnexpectedEOF {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			chunkBytes := make([]byte, chunkLength)
+			if _, err := io.ReadFull(f, chunkBytes); err != nil {
+				return nil, err
+			}
+
+			chunkHash, err := decode.DecodeString(bytes.NewBuffer(chunkBytes))
+			if err != nil {
+				return nil, err
+			}
+
+			if crypto.CompareHashes(chunkRef, *chunkHash) {
+				var chunk sql.SQLRecordChunk
+				if err := chunk.DecodeFromBytes(chunkBytes); err != nil {
+					return nil, err
+				}
+				return &chunk, nil
+			}
+		}
+
+		return nil, services.ErrBackupChunkNotFound
+	default:
+		return nil, services.ErrRecordNotSupported
+	}
+}
+
+func (reader *BinaryBackupReader) readSchemaDataChunkDiffByType(recordType entities.RecordType, chunkRef string, f *os.File) (entities.SchemaRecordChunkDiff, error) {
+	switch recordType {
+	case entities.SQLRecord:
+		for {
+			var chunkLength int64
+			if err := binary.Read(f, binary.LittleEndian, &chunkLength); err == io.EOF || err == io.ErrUnexpectedEOF {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			chunkBytes := make([]byte, chunkLength)
+			if _, err := io.ReadFull(f, chunkBytes); err != nil {
+				return nil, err
+			}
+
+			var diff sql.SQLRecordChunkDiff
+			if err := diff.DecodeFromBytes(chunkBytes); err != nil {
+				return nil, err
+			}
+
+			if crypto.CompareHashes(chunkRef, *diff.Hash()) {
+				return &diff, nil
+			}
+		}
+
+		return nil, services.ErrBackupChunkNotFound
+	default:
+		return nil, services.ErrRecordNotSupported
 	}
 }
