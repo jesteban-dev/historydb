@@ -11,4 +11,5 @@ type BackupReader interface {
 	GetBackupMetadata() (entities.BackupMetadata, error)
 	GetBackupSnapshot(snapshotId string) (entities.BackupSnapshot, error)
 	GetSchemaDependency(filename string) (entities.SchemaDependency, error)
+	GetSchema(filename string) (entities.Schema, error)
 }

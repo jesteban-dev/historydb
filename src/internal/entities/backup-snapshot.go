@@ -19,7 +19,7 @@ type BackupSnapshot struct {
 	Timestamp          time.Time
 	SnapshotId         string
 	SchemaDependencies map[string]string
-	//Schemas            map[string]string                   `json:"schemas"`
+	Schemas            map[string]string
 	//Data               map[string]BackupSnapshotSchemaData `json:"data"`
 }
 
@@ -42,11 +42,15 @@ func (snapshot *BackupSnapshot) encodeData() []byte {
 	if len(snapshot.SchemaDependencies) > 0 {
 		flags |= 1 << 0
 	}
+	if len(snapshot.Schemas) > 0 {
+		flags |= 1 << 1
+	}
 
 	buf.WriteByte(flags)
 	encode.EncodeTime(&buf, &snapshot.Timestamp)
 	encode.EncodeString(&buf, &snapshot.SnapshotId)
 	encode.EncodeMap(&buf, types.ToInterfaceMap(snapshot.SchemaDependencies))
+	encode.EncodeMap(&buf, types.ToInterfaceMap(snapshot.Schemas))
 
 	return buf.Bytes()
 }
@@ -78,10 +82,23 @@ func (snapshot *BackupSnapshot) DecodeFromBytes(data []byte) error {
 			return err
 		}
 	}
+	var schemasMap map[string]string
+	if flags&(1<<1) != 0 {
+		schemas, err := decode.DecodeMap(buf)
+		if err != nil {
+			return err
+		}
+
+		schemasMap, err = types.FromInterfaceMap[string](schemas)
+		if err != nil {
+			return err
+		}
+	}
 
 	snapshot.Timestamp = *timestamp
 	snapshot.SnapshotId = *snapshotId
 	snapshot.SchemaDependencies = schemaDependenciesMap
+	snapshot.Schemas = schemasMap
 	return nil
 }
 

@@ -42,6 +42,18 @@ func DecodeMap(buf *bytes.Buffer) (map[string]interface{}, error) {
 				return nil, err
 			}
 			m[*k] = *str
+		case 0x02:
+			i, err := DecodeInt(mapBuf)
+			if err != nil {
+				return nil, err
+			}
+			m[*k] = *i
+		case 0x03:
+			b, err := DecodeBool(mapBuf)
+			if err != nil {
+				return nil, err
+			}
+			m[*k] = *b
 		default:
 			panic("unsupported type")
 		}

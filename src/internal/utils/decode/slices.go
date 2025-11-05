@@ -33,7 +33,7 @@ loop:
 				}
 				return nil, err
 			}
-			slice = append(slice, any(s).(T))
+			slice = append(slice, any(*s).(T))
 		case int:
 			i, err := DecodeInt(sliceBuf)
 			if err != nil {
@@ -42,7 +42,7 @@ loop:
 				}
 				return nil, err
 			}
-			slice = append(slice, any(i).(T))
+			slice = append(slice, any(*i).(T))
 		case bool:
 			b, err := DecodeBool(sliceBuf)
 			if err != nil {
@@ -51,7 +51,7 @@ loop:
 				}
 				return nil, err
 			}
-			slice = append(slice, any(b).(T))
+			slice = append(slice, any(*b).(T))
 		default:
 			break
 		}
