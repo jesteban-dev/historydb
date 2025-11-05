@@ -15,5 +15,5 @@ type DatabaseReader interface {
 	GetSchemaDefinition(schemaName string) (entities.Schema, error)
 	GetSchemaDataLength(schemaName string) (int, error)
 	GetSchemaDataBatchAndChunkSize(schemaName string) (int, int, error)
-	GetSchemaDataChunk(schema entities.Schema, chunkSize uint, chunkCursor entities.ChunkCursor) ([]entities.SchemaData, entities.ChunkCursor, error)
+	GetSchemaDataChunk(schema entities.Schema, chunkSize int, chunkCursor entities.ChunkCursor) (entities.SchemaDataChunk, entities.ChunkCursor, error)
 }
