@@ -1,34 +1,35 @@
-package impl
+package database_impl
 
 import (
 	"database/sql"
 	"fmt"
 	"historydb/src/internal/helpers"
 	"historydb/src/internal/services"
-	"historydb/src/internal/services/impl/entities"
-	"historydb/src/internal/services/impl/utils"
+	"historydb/src/internal/services/database_impl/entities"
+	"historydb/src/internal/services/database_impl/utils"
+	"strconv"
 	"strings"
 
 	"github.com/lib/pq"
 )
 
 // DatabaseReaderPostgreSQL represents the implementation of DatabaseReader for PostgreSQL databases.
-type DatabaseReaderPostgreSQL struct {
+type PostgreSQLDatabaseReader struct {
 	db *sql.DB
 }
 
 // NewDatabaseReaderPostgreSQL creates a new DatabaseReaderPostgreSQL with the provided database connection.
 //
 // It returns a pointer to the created DatabaseReaderPostgreSQL.
-func NewDatabaseReaderPostgreSQL(db *sql.DB) *DatabaseReaderPostgreSQL {
-	return &DatabaseReaderPostgreSQL{db}
+func NewPostgreSQLDatabaseReader(db *sql.DB) *PostgreSQLDatabaseReader {
+	return &PostgreSQLDatabaseReader{db}
 }
 
 // ListEntitiesDefinition implements the same function for DatabaseReader interface that returns all metadata from
 // the tables in the database.
 //
 // It returs a slice with all tables metadata and an error if the process fails.
-func (dbReader *DatabaseReaderPostgreSQL) ListSchemasDefinition() ([]services.Schema, error) {
+func (dbReader *PostgreSQLDatabaseReader) ListSchemasDefinition() ([]services.Schema, error) {
 	rows, err := dbReader.db.Query(`
 		SELECT table_schema, table_name
 		FROM information_schema.tables
@@ -59,10 +60,25 @@ func (dbReader *DatabaseReaderPostgreSQL) ListSchemasDefinition() ([]services.Sc
 	return schemaList, nil
 }
 
-// GetSchemaDataBatch implements the same function for DatabaseReader interface that a batch of the table rows.
+// ListExtraObjects implements the same function for DatabaseReader interface that obtainer the next database extra objects:
+// - Sequences
+//
+// It returns a slice with all extra objects needed in the database and an error if the process fails.
+func (dbReader *PostgreSQLDatabaseReader) GetDatabaseExtraInfo() (services.DBExtraInfo, error) {
+	sequences, err := dbReader.extractSequences()
+	if err != nil {
+		return nil, err
+	}
+
+	return &entities.PSQLDBExtraInfo{
+		Sequences: sequences,
+	}, nil
+}
+
+// GetSchemaDataBatch implements the same function for DatabaseReader interface that obtains a batch of the table rows.
 //
 // It returs a slice with the content in the data rows of the batch, the updated batch cursor to use in the next call, and an error if the process fail.
-func (dbReader *DatabaseReaderPostgreSQL) GetSchemaDataBatch(schema services.Schema, batchSize uint, batchCursor services.BatchCursor) ([]services.SchemaData, services.BatchCursor, error) {
+func (dbReader *PostgreSQLDatabaseReader) GetSchemaDataBatch(schema services.Schema, batchSize uint, batchCursor services.BatchCursor) ([]services.SchemaData, services.BatchCursor, error) {
 	if schema == nil {
 		return nil, nil, ErrNullSchema
 	}
@@ -78,7 +94,7 @@ func (dbReader *DatabaseReaderPostgreSQL) GetSchemaDataBatch(schema services.Sch
 	var err error
 	pKeys, ok := utils.ExtractPrimaryKey(*table)
 	if !ok {
-		query := fmt.Sprintf("SELECT * FROM %s.%s ORDER BY ctid LIMIT $2 OFFSET $3", pq.QuoteIdentifier(schemaName), pq.QuoteIdentifier(tableName))
+		query := fmt.Sprintf("SELECT * FROM %s.%s ORDER BY ctid LIMIT $1 OFFSET $2", pq.QuoteIdentifier(schemaName), pq.QuoteIdentifier(tableName))
 
 		rows, err = dbReader.db.Query(query, batchSize, cursor.Offset)
 	} else {
@@ -126,6 +142,8 @@ func (dbReader *DatabaseReaderPostgreSQL) GetSchemaDataBatch(schema services.Sch
 			if ok {
 				if col.ColumnType == "bytea" {
 					val = b
+				} else if strings.HasPrefix(col.ColumnType, "numeric") {
+					val, _ = strconv.ParseFloat(string(b), 64)
 				} else {
 					val = string(b)
 				}
@@ -154,7 +172,7 @@ func (dbReader *DatabaseReaderPostgreSQL) GetSchemaDataBatch(schema services.Sch
 //
 // It receives the full schema.table name.
 // It returns the schema and table names.
-func (dbReader *DatabaseReaderPostgreSQL) parseTableName(name string) (schema, table string) {
+func (dbReader *PostgreSQLDatabaseReader) parseTableName(name string) (schema, table string) {
 	parts := strings.Split(name, ".")
 	if len(parts) == 2 {
 		return parts[0], parts[1]
@@ -167,7 +185,7 @@ func (dbReader *DatabaseReaderPostgreSQL) parseTableName(name string) (schema, t
 //
 // It receives the schema and name of the table on the database.
 // It returns the table definition or metadata and an error if the process fails.
-func (dbReader *DatabaseReaderPostgreSQL) getTableDefinition(tableSchema string, tableName string) (services.Schema, error) {
+func (dbReader *PostgreSQLDatabaseReader) getTableDefinition(tableSchema string, tableName string) (services.Schema, error) {
 	columns, err := dbReader.extractColumns(tableSchema, tableName)
 	if err != nil {
 		return nil, err
@@ -201,9 +219,9 @@ func (dbReader *DatabaseReaderPostgreSQL) getTableDefinition(tableSchema string,
 //
 // It receives the schema and name of the table on the database.
 // It returns a slice of columns and an error if the process fails.
-func (dbReader *DatabaseReaderPostgreSQL) extractColumns(tableSchema string, tableName string) ([]entities.TableColumn, error) {
+func (dbReader *PostgreSQLDatabaseReader) extractColumns(tableSchema string, tableName string) ([]entities.TableColumn, error) {
 	rows, err := dbReader.db.Query(`
-		SELECT column_name, data_type, CASE is_nullable WHEN 'YES' THEN true ELSE false END AS is_nullable, column_default, ordinal_position, character_maximum_length
+		SELECT column_name, data_type, CASE is_nullable WHEN 'YES' THEN true ELSE false END AS is_nullable, column_default, ordinal_position, character_maximum_length, numeric_precision, numeric_scale
 		FROM information_schema.columns
 		WHERE table_schema = $1 AND table_name = $2
 		ORDER BY ordinal_position
@@ -215,14 +233,17 @@ func (dbReader *DatabaseReaderPostgreSQL) extractColumns(tableSchema string, tab
 
 	columns := []entities.TableColumn{}
 	for rows.Next() {
-		var c entities.PSQLColumn
-		err := rows.Scan(&c.ColumnName, &c.DataType, &c.IsNullable, &c.ColumnDefault, &c.OrdinalPosition, &c.CharacterMaximumLength)
+		var c entities.PSQLColumnQuery
+		err := rows.Scan(&c.ColumnName, &c.DataType, &c.IsNullable, &c.ColumnDefault, &c.OrdinalPosition, &c.CharacterMaximumLength, &c.NumericPrecision, &c.NumericScale)
 		if err != nil {
 			return nil, err
 		}
 
 		if c.CharacterMaximumLength != nil {
 			c.DataType = fmt.Sprintf("%s(%d)", c.DataType, *c.CharacterMaximumLength)
+		}
+		if (c.DataType == "numeric" || c.DataType == "decimal" || c.DataType == "real" || c.DataType == "double precision") && c.NumericPrecision != nil && c.NumericScale != nil {
+			c.DataType = fmt.Sprintf("%s(%d,%d)", c.DataType, *c.NumericPrecision, *c.NumericScale)
 		}
 
 		columns = append(columns, entities.TableColumn{
@@ -241,7 +262,7 @@ func (dbReader *DatabaseReaderPostgreSQL) extractColumns(tableSchema string, tab
 //
 // It receives the schema and name of the table on the database.
 // It returns a slice of constraints and an error if the process fails.
-func (dbReader *DatabaseReaderPostgreSQL) extractConstraints(tableSchema string, tableName string) ([]entities.TableConstraint, error) {
+func (dbReader *PostgreSQLDatabaseReader) extractConstraints(tableSchema string, tableName string) ([]entities.TableConstraint, error) {
 	rows, err := dbReader.db.Query(`
 		SELECT tc.constraint_name, tc.constraint_type, kcu.column_name, CASE WHEN constraint_type = 'CHECK' THEN substring(pg_get_constraintdef(c.oid) FROM 'CHECK \((.*)\)') ELSE NULL END AS definition
 		FROM information_schema.table_constraints tc
@@ -257,7 +278,7 @@ func (dbReader *DatabaseReaderPostgreSQL) extractConstraints(tableSchema string,
 
 	constraintMap := make(map[string]*entities.TableConstraint)
 	for rows.Next() {
-		var c entities.PSQLConstraint
+		var c entities.PSQLConstraintQuery
 		err := rows.Scan(&c.ConstraintName, &c.ConstraintType, &c.ColumnName, &c.Definition)
 		if err != nil {
 			return nil, err
@@ -294,9 +315,9 @@ func (dbReader *DatabaseReaderPostgreSQL) extractConstraints(tableSchema string,
 //
 // It receives the schema and name of the table on the database.
 // It returns a slice of foreign keys and an error if the process fails.
-func (dbReader *DatabaseReaderPostgreSQL) extractForeignKeys(tableSchema string, tableName string) ([]entities.ForeignKey, error) {
+func (dbReader *PostgreSQLDatabaseReader) extractForeignKeys(tableSchema string, tableName string) ([]entities.ForeignKey, error) {
 	rows, err := dbReader.db.Query(`
-		SELECT tc.constraint_name, kcu.column_name, ccu.table_name AS referenced_table, ccu.column_name AS referenced_column, rc.update_rule, rc.delete_rule
+		SELECT tc.constraint_name, kcu.column_name, ccu.table_schema AS referenced_schema, ccu.table_name AS referenced_table, ccu.column_name AS referenced_column, rc.update_rule, rc.delete_rule
 		FROM information_schema.table_constraints tc
 			LEFT JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name
 			JOIN information_schema.referential_constraints rc ON tc.constraint_name = rc.constraint_name AND tc.constraint_schema = rc.constraint_schema
@@ -311,8 +332,8 @@ func (dbReader *DatabaseReaderPostgreSQL) extractForeignKeys(tableSchema string,
 
 	constraintMap := make(map[string]*entities.ForeignKey)
 	for rows.Next() {
-		var c entities.PSQLForeignKey
-		err := rows.Scan(&c.ConstraintName, &c.ColumnName, &c.ReferencedTable, &c.ReferencedColumn, &c.UpdateRule, &c.DeleteRule)
+		var c entities.PSQLForeignKeyQuery
+		err := rows.Scan(&c.ConstraintName, &c.ColumnName, &c.ReferencedSchema, &c.ReferencedTable, &c.ReferencedColumn, &c.UpdateRule, &c.DeleteRule)
 		if err != nil {
 			return nil, err
 		}
@@ -322,7 +343,7 @@ func (dbReader *DatabaseReaderPostgreSQL) extractForeignKeys(tableSchema string,
 			fk = &entities.ForeignKey{
 				ConstraintName:    c.ConstraintName,
 				Columns:           []string{c.ColumnName},
-				ReferencedTable:   c.ReferencedTable,
+				ReferencedTable:   fmt.Sprintf("%s.%s", c.ReferencedSchema, c.ReferencedTable),
 				ReferencedColumns: []string{c.ReferencedColumn},
 				UpdateAction:      entities.ActionType(c.UpdateRule),
 				DeleteAction:      entities.ActionType(c.DeleteRule),
@@ -347,9 +368,9 @@ func (dbReader *DatabaseReaderPostgreSQL) extractForeignKeys(tableSchema string,
 //
 // It receives the schema and name of the table on the database.
 // It returns a slice of indexes and an error if the process fails.
-func (dbReader *DatabaseReaderPostgreSQL) extractIndexes(tableSchema string, tableName string) ([]entities.Index, error) {
+func (dbReader *PostgreSQLDatabaseReader) extractIndexes(tableSchema string, tableName string) ([]entities.Index, error) {
 	rows, err := dbReader.db.Query(`
-		SELECT pci.relname as index_name, am.amname as index_type, array_agg(a.attname ORDER BY x.ordinality) AS column_names, pi.indisunique as is_unique, pi.indisprimary as is_primary, pg_get_expr(pi.indpred, pi.indrelid) AS partial_condition
+		SELECT pci.relname as index_name, am.amname as index_type, array_agg(a.attname ORDER BY x.ordinality) AS column_names, pi.indisunique as is_unique, pg_get_expr(pi.indpred, pi.indrelid) AS partial_condition
 		FROM pg_class pc
 			JOIN pg_namespace ns ON ns.oid = pc.relnamespace
 			JOIN pg_index pi ON pc.oid = pi.indrelid
@@ -357,11 +378,11 @@ func (dbReader *DatabaseReaderPostgreSQL) extractIndexes(tableSchema string, tab
 			JOIN pg_am am ON pci.relam = am.oid
 			JOIN LATERAL UNNEST(pi.indkey) WITH ORDINALITY AS x(attnum, ordinality) ON TRUE
 			LEFT JOIN pg_attribute a ON a.attrelid = pc.oid AND a.attnum = x.attnum
-		WHERE pc.relkind = 'r' AND ns.nspname = $1 AND pc.relname = $2
+			LEFT JOIN pg_constraint c ON c.conindid = pi.indexrelid
+		WHERE pc.relkind = 'r' AND ns.nspname = $1 AND pc.relname = $2 AND c.oid IS NULL
 		GROUP BY pci.relname, pi.indisunique, pi.indisprimary, am.amname, pi.indpred, pci.oid, pi.indrelid
 		ORDER BY pci.relname
 	`, tableSchema, tableName)
-
 	if err != nil {
 		return nil, err
 	}
@@ -369,13 +390,13 @@ func (dbReader *DatabaseReaderPostgreSQL) extractIndexes(tableSchema string, tab
 
 	indexes := []entities.Index{}
 	for rows.Next() {
-		var i entities.PSQLIndex
-		err := rows.Scan(&i.IndexName, &i.IndexType, pq.Array(&i.ColumnNames), &i.IsUnique, &i.IsPrimary, &i.PartialCondition)
+		var i entities.PSQLIndexQuery
+		err := rows.Scan(&i.IndexName, &i.IndexType, pq.Array(&i.ColumnNames), &i.IsUnique, &i.PartialCondition)
 		if err != nil {
 			return nil, err
 		}
 
-		options := map[string]interface{}{"isUnique": i.IsUnique, "isPrimary": i.IsPrimary}
+		options := map[string]interface{}{"isUnique": i.IsUnique}
 		if i.PartialCondition != nil {
 			options["partialCondition"] = i.PartialCondition
 		}
@@ -389,4 +410,48 @@ func (dbReader *DatabaseReaderPostgreSQL) extractIndexes(tableSchema string, tab
 	}
 
 	return indexes, nil
+}
+
+// extractSequences is a PostgreSQL specific method that return the sequences used in the database with its current values.
+//
+// It returns a slice of sequences and an error if the process fails.
+func (dbReader *PostgreSQLDatabaseReader) extractSequences() ([]entities.PSQLSequence, error) {
+	rows, err := dbReader.db.Query(`
+		SELECT sequence_schema, sequence_name, data_type, start_value::bigint, minimum_value::bigint, maximum_value::bigint, increment::bigint, CASE cycle_option WHEN 'YES' THEN TRUE ELSE FALSE END AS cycle_option
+		FROM information_schema.sequences
+		ORDER BY sequence_schema, sequence_name
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	sequences := []entities.PSQLSequence{}
+	for rows.Next() {
+		var s entities.PSQLSequenceDataQuery
+		if err := rows.Scan(&s.SequenceSchema, &s.SequenceName, &s.DataType, &s.StartValue, &s.MinimumValue, &s.MaximumValue, &s.Increment, &s.CycleOption); err != nil {
+			return nil, err
+		}
+
+		var lastValue uint
+		var isCalled bool
+		valueQuery := fmt.Sprintf("SELECT last_value, is_called FROM %s.%s", pq.QuoteIdentifier(s.SequenceSchema), pq.QuoteIdentifier(s.SequenceName))
+		if err := dbReader.db.QueryRow(valueQuery).Scan(&lastValue, &isCalled); err != nil {
+			return nil, err
+		}
+
+		sequences = append(sequences, entities.PSQLSequence{
+			SequenceName: fmt.Sprintf("%s.%s", s.SequenceSchema, s.SequenceName),
+			DataType:     s.DataType,
+			StartValue:   s.StartValue,
+			MinimumValue: s.MinimumValue,
+			MaximumValue: s.MaximumValue,
+			Increment:    s.Increment,
+			CycleOption:  s.CycleOption,
+			LastValue:    lastValue,
+			IsCalled:     isCalled,
+		})
+	}
+
+	return sequences, nil
 }

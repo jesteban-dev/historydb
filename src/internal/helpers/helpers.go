@@ -13,3 +13,8 @@ func ToInterfaceSlice(v interface{}) []interface{} {
 		return []interface{}{val}
 	}
 }
+
+// Pointer converts a single variable into a pointer
+func Pointer[T any](v T) *T {
+	return &v
+}
