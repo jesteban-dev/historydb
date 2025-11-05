@@ -7,6 +7,7 @@ import (
 	"historydb/src/internal/services/entities/psql"
 	"historydb/src/internal/services/entities/sql"
 	"historydb/src/internal/utils/pointers"
+	"os"
 	"testing"
 	"time"
 
@@ -95,17 +96,17 @@ var expectedSchemas map[string]entities.Schema = map[string]entities.Schema{
 var expectedRecordBatch map[string][]RecordBatchInfo = map[string][]RecordBatchInfo{
 	"Table1": {
 		{batchName: "Batch1-1", chunks: []entities.SchemaRecordChunk{
-			&sql.SQLRecordChunk{Content: []sql.SQLRecord{
+			&sql.SQLRecordChunk{Version: 1, Content: []sql.SQLRecord{
 				{Content: map[string]interface{}{"Column1": int64(1), "Column2": "test1"}},
 				{Content: map[string]interface{}{"Column1": int64(2), "Column2": "test2"}},
 			}},
-			&sql.SQLRecordChunk{Content: []sql.SQLRecord{
+			&sql.SQLRecordChunk{Version: 1, Content: []sql.SQLRecord{
 				{Content: map[string]interface{}{"Column1": int64(3), "Column2": "test3"}},
 				{Content: map[string]interface{}{"Column1": int64(4), "Column2": "test4"}},
 			}},
 		}},
 		{batchName: "Batch1-2", chunks: []entities.SchemaRecordChunk{
-			&sql.SQLRecordChunk{Content: []sql.SQLRecord{
+			&sql.SQLRecordChunk{Version: 1, Content: []sql.SQLRecord{
 				{Content: map[string]interface{}{"Column1": int64(5), "Column2": "test5"}},
 				{Content: map[string]interface{}{"Column1": int64(6), "Column2": "test6"}},
 			}},
@@ -113,7 +114,7 @@ var expectedRecordBatch map[string][]RecordBatchInfo = map[string][]RecordBatchI
 	},
 	"Table2": {
 		{batchName: "Batch2-1", chunks: []entities.SchemaRecordChunk{
-			&sql.SQLRecordChunk{Content: []sql.SQLRecord{
+			&sql.SQLRecordChunk{Version: 1, Content: []sql.SQLRecord{
 				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test1", "Column3": int64(1)}},
 				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test3", "Column3": int64(3)}},
 				{Content: map[string]interface{}{"Column1": time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test4", "Column3": int64(4)}},
@@ -122,11 +123,11 @@ var expectedRecordBatch map[string][]RecordBatchInfo = map[string][]RecordBatchI
 	},
 	"Table3": {
 		{batchName: "Batch3-1", chunks: []entities.SchemaRecordChunk{
-			&sql.SQLRecordChunk{Content: []sql.SQLRecord{
+			&sql.SQLRecordChunk{Version: 1, Content: []sql.SQLRecord{
 				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test2", "Column3": int64(2), "Column4": true}},
 				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test10", "Column3": int64(10), "Column4": false}},
 			}},
-			&sql.SQLRecordChunk{Content: []sql.SQLRecord{
+			&sql.SQLRecordChunk{Version: 1, Content: []sql.SQLRecord{
 				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test3", "Column3": int64(3), "Column4": true}},
 				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test4", "Column3": int64(4), "Column4": true}},
 				{Content: map[string]interface{}{"Column1": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339), "Column2": "test11", "Column3": int64(11), "Column4": false}},
@@ -136,10 +137,10 @@ var expectedRecordBatch map[string][]RecordBatchInfo = map[string][]RecordBatchI
 }
 
 var expectedRoutines map[string]entities.Routine = map[string]entities.Routine{
-	"Function1":  &psql.PSQLFunction{Version: 1, Name: "Function1", Language: "pgplpsql", Volatility: pointers.Ptr("STATIC"), Parameters: pointers.Ptr("p1 string, p2 string"), ReturnType: "integer", Tag: "$$", Definition: "RETURN LEN(p1) + LEN(p2)"},
-	"Function2":  &psql.PSQLFunction{Version: 1, Name: "Function2", Language: "pgplpsql", Dependencies: []string{"Function1"}, Parameters: nil, ReturnType: "integer", Tag: "$$function$$", Definition: "RETURN Function1(test)"},
-	"Procedure1": &psql.PSQLProcedure{Version: 1, Name: "Procedure1", Language: "sql", Tag: "$$", Definition: "LOOP 1 TO 1000"},
-	"Procedure2": &psql.PSQLProcedure{Version: 1, Name: "Procedure2", Language: "sql", Dependencies: []string{"Procedure1"}, Parameters: pointers.Ptr("string, string"), Tag: "$$", Definition: "DO $1 - $2 AND Procedure1()"},
+	"Function1":  &psql.PSQLFunction{Version: 1, Name: "Function1", Language: "pgplpsql", Volatility: "STATIC", Parameters: "p1 string, p2 string", Dependencies: []string{}, ReturnType: "integer", Tag: "$$", Definition: "RETURN LEN(p1) + LEN(p2)"},
+	"Function2":  &psql.PSQLFunction{Version: 1, Name: "Function2", Language: "pgplpsql", Dependencies: []string{"Function1"}, ReturnType: "integer", Tag: "$$function$$", Definition: "RETURN Function1(test)"},
+	"Procedure1": &psql.PSQLProcedure{Version: 1, Name: "Procedure1", Language: "sql", Dependencies: []string{}, Tag: "$$", Definition: "LOOP 1 TO 1000"},
+	"Procedure2": &psql.PSQLProcedure{Version: 1, Name: "Procedure2", Language: "sql", Dependencies: []string{"Procedure1"}, Parameters: "string, string", Tag: "$$", Definition: "DO $1 - $2 AND Procedure1()"},
 	"Trigger1":   &psql.PSQLTrigger{Version: 1, Name: "Trigger1", Definition: "DO LOOP 1 TO 50 AND SUM(50, 20)"},
 	"Trigger2":   &psql.PSQLTrigger{Version: 1, Name: "Trigger2", Definition: "THIS IS THE SECOND TRIGGER DEFINITION"},
 }
@@ -159,6 +160,7 @@ func TestBinaryBackup(t *testing.T) {
 
 	// Writing snapshot
 	metadata := entities.BackupMetadata{
+		Version:        1,
 		DatabaseEngine: "test",
 	}
 
@@ -169,6 +171,7 @@ func TestBinaryBackup(t *testing.T) {
 	snapshot := entities.BackupSnapshot{
 		Timestamp:          time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC),
 		SnapshotId:         "test-snapshot",
+		Message:            "Commit",
 		SchemaDependencies: make(map[string]string),
 		Schemas:            make(map[string]string),
 		Data:               make(map[string]entities.BackupSnapshotSchemaData),
@@ -383,14 +386,14 @@ func TestBinaryBackup(t *testing.T) {
 		"Function1": {
 			routine: &psql.PSQLFunction{Version: 1, Name: "Function1", Language: "sql", ReturnType: "integer", Tag: "$$", Definition: "RETURN 1"},
 			toDiff: []entities.Routine{
-				&psql.PSQLFunction{Version: 1, Name: "Function1", Language: "pgplpsql", Volatility: pointers.Ptr("STATIC"), Parameters: pointers.Ptr("p1 string, p2 string"), ReturnType: "integer", Tag: "$$", Definition: "RETURN LEN(p1) + LEN(p2)"},
+				&psql.PSQLFunction{Version: 1, Name: "Function1", Language: "pgplpsql", Volatility: "STATIC", Parameters: "p1 string, p2 string", ReturnType: "integer", Tag: "$$", Definition: "RETURN LEN(p1) + LEN(p2)"},
 			},
 		},
 		"Function2": {
-			routine: &psql.PSQLFunction{Version: 1, Name: "Function2", Language: "sql", Parameters: pointers.Ptr("string, int"), ReturnType: "string", Tag: "$$", Definition: "RETURN $1"},
+			routine: &psql.PSQLFunction{Version: 1, Name: "Function2", Language: "sql", Parameters: "string, int", ReturnType: "string", Tag: "$$", Definition: "RETURN $1"},
 			toDiff: []entities.Routine{
-				&psql.PSQLFunction{Version: 1, Name: "Function2", Language: "sql", Dependencies: []string{"Function1"}, Parameters: nil, ReturnType: "string", Tag: "$$", Definition: "RETURN string"},
-				&psql.PSQLFunction{Version: 1, Name: "Function2", Language: "pgplpsql", Dependencies: []string{"Function1"}, Parameters: nil, ReturnType: "integer", Tag: "$$function$$", Definition: "RETURN Function1(test)"},
+				&psql.PSQLFunction{Version: 1, Name: "Function2", Language: "sql", Dependencies: []string{"Function1"}, ReturnType: "string", Tag: "$$", Definition: "RETURN string"},
+				&psql.PSQLFunction{Version: 1, Name: "Function2", Language: "pgplpsql", Dependencies: []string{"Function1"}, ReturnType: "integer", Tag: "$$function$$", Definition: "RETURN Function1(test)"},
 			},
 		},
 		"Procedure1": {
@@ -399,7 +402,7 @@ func TestBinaryBackup(t *testing.T) {
 		"Procedure2": {
 			routine: &psql.PSQLProcedure{Version: 1, Name: "Procedure2", Language: "pgplpsql", Tag: "$$function$$", Definition: "LOOP 1 TO 50"},
 			toDiff: []entities.Routine{
-				&psql.PSQLProcedure{Version: 1, Name: "Procedure2", Language: "sql", Dependencies: []string{"Procedure1"}, Parameters: pointers.Ptr("string, string"), Tag: "$$", Definition: "DO $1 - $2 AND Procedure1()"},
+				&psql.PSQLProcedure{Version: 1, Name: "Procedure2", Language: "sql", Dependencies: []string{"Procedure1"}, Parameters: "string, string", Tag: "$$", Definition: "DO $1 - $2 AND Procedure1()"},
 			},
 		},
 		"Trigger1": {
@@ -530,6 +533,8 @@ func TestBinaryBackup(t *testing.T) {
 		}
 	}
 
+	metadata.Snapshots = append(metadata.Snapshots, entities.BackupMetadataSnapshot{Timestamp: snapshot.Timestamp, SnapshotId: snapshot.SnapshotId, Message: "Commit"})
+
 	err = backupWriter.CommitSnapshot(&metadata)
 	assert.Nil(t, err)
 
@@ -585,4 +590,6 @@ func TestBinaryBackup(t *testing.T) {
 	// Deleting backup
 	err = backupWriter.DeleteBackupStructure()
 	assert.Nil(t, err)
+
+	os.RemoveAll("test")
 }

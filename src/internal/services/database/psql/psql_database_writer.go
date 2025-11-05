@@ -223,23 +223,11 @@ func (writer *PSQLDatabaseWriter) SaveRoutine(routine entities.Routine) error {
 	if routine.GetRoutineType() == entities.PSQLFunction {
 		function := routine.(*psql.PSQLFunction)
 
-		query = fmt.Sprintf("CREATE FUNCTION %s(", function.Name)
-		if function.Parameters != nil {
-			query += *function.Parameters
-		}
-		query += fmt.Sprintf(") RETURNS %s LANGUAGE %s AS %s %s %s", function.ReturnType, function.Language, function.Tag, function.Definition, function.Tag)
-
-		if function.Volatility != nil {
-			query += fmt.Sprintf(" %s", *function.Volatility)
-		}
+		query = fmt.Sprintf("CREATE FUNCTION %s(%s) RETURNS %s LANGUAGE %s AS %s %s %s %s", function.Name, function.Parameters, function.ReturnType, function.Language, function.Tag, function.Definition, function.Tag, function.Volatility)
 	} else if routine.GetRoutineType() == entities.PSQLProcedure {
 		procedure := routine.(*psql.PSQLProcedure)
 
-		query = fmt.Sprintf("CREATE PROCEDURE %s(", procedure.Name)
-		if procedure.Parameters != nil {
-			query += *procedure.Parameters
-		}
-		query += fmt.Sprintf(") LANGUAGE %s AS %s %s %s", procedure.Language, procedure.Tag, procedure.Definition, procedure.Tag)
+		query = fmt.Sprintf("CREATE PROCEDURE %s(%s) LANGUAGE %s AS %s %s %s", procedure.Name, procedure.Parameters, procedure.Language, procedure.Tag, procedure.Definition, procedure.Tag)
 	} else if routine.GetRoutineType() == entities.PSQLTrigger {
 		trigger := routine.(*psql.PSQLTrigger)
 

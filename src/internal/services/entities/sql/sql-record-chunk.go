@@ -18,8 +18,11 @@ type SQLChunkCursor struct {
 	LastPK interface{}
 }
 
+var SQLRECORDCHUNK_VERSION int64 = 1
+
 type SQLRecordChunk struct {
 	hash    string
+	Version int64
 	Content []SQLRecord
 }
 
@@ -142,6 +145,10 @@ func (chunk *SQLRecordChunk) DecodeFromBytes(data []byte) error {
 	if err != nil {
 		return err
 	}
+	version, err := decode.DecodeInt(buf)
+	if err != nil {
+		return err
+	}
 	var contentSlice []SQLRecord
 	content, err := decode.DecodeSlice[*SQLRecord](buf)
 	if err != nil {
@@ -153,12 +160,14 @@ func (chunk *SQLRecordChunk) DecodeFromBytes(data []byte) error {
 	}
 
 	chunk.hash = *hash
+	chunk.Version = *version
 	chunk.Content = contentSlice
 	return nil
 }
 
 func (chunk *SQLRecordChunk) encodeData() []byte {
 	var buf bytes.Buffer
+	encode.EncodeInt(&buf, &SQLRECORDCHUNK_VERSION)
 	encode.EncodeSlice(&buf, chunk.Content)
 
 	encodedData := buf.Bytes()

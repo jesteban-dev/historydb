@@ -8,11 +8,14 @@ import (
 	"time"
 )
 
+var BACKUPMETADATA_VERSION int64 = 1
+
 // BackupMetadata defines a struct which contains all the basic data required by the app
 //
 // DatabaseEngine -> The DB Engine used in the backup
 // Snapshots -> List of all snapshots taken in the backup
 type BackupMetadata struct {
+	Version        int64
 	DatabaseEngine string
 	Snapshots      []BackupMetadataSnapshot
 }
@@ -38,6 +41,7 @@ func (metadata *BackupMetadata) encodeData() []byte {
 	}
 
 	buf.WriteByte(flags)
+	encode.EncodeInt(&buf, &BACKUPMETADATA_VERSION)
 	encode.EncodeString(&buf, &metadata.DatabaseEngine)
 	encode.EncodeSlice(&buf, metadata.Snapshots)
 
@@ -48,6 +52,10 @@ func (metadata *BackupMetadata) DecodeFromBytes(data []byte) error {
 	buf := bytes.NewBuffer(data)
 
 	flags, err := buf.ReadByte()
+	if err != nil {
+		return err
+	}
+	version, err := decode.DecodeInt(buf)
 	if err != nil {
 		return err
 	}
@@ -68,6 +76,7 @@ func (metadata *BackupMetadata) DecodeFromBytes(data []byte) error {
 		}
 	}
 
+	metadata.Version = *version
 	metadata.DatabaseEngine = *engine
 	metadata.Snapshots = snapshotSlice
 	return nil

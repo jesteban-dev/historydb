@@ -294,18 +294,23 @@ func (reader *PSQLDatabaseReader) ListRoutines() ([]entities.Routine, error) {
 
 	for routineRows.Next() {
 		var functionSchema, functionName, functionType, language, returnType, tag, definition string
-		var volatility, parameters *string
+		var volatility, parameters sql.NullString
 		if err := routineRows.Scan(&functionSchema, &functionName, &functionType, &language, &volatility, &parameters, &returnType, &tag, &definition); err != nil {
 			return nil, err
+		}
+
+		dependencyList, ok := dependencies[fmt.Sprintf("%s.%s", functionSchema, functionName)]
+		if !ok {
+			dependencyList = []string{}
 		}
 
 		if functionType == "f" {
 			function := psql.PSQLFunction{
 				Name:         fmt.Sprintf("%s.%s", functionSchema, functionName),
 				Language:     language,
-				Volatility:   volatility,
-				Dependencies: dependencies[fmt.Sprintf("%s.%s", functionSchema, functionName)],
-				Parameters:   parameters,
+				Volatility:   volatility.String,
+				Dependencies: dependencyList,
+				Parameters:   parameters.String,
 				ReturnType:   returnType,
 				Tag:          tag,
 				Definition:   normalizeRoutineDefinition(definition),
@@ -316,8 +321,8 @@ func (reader *PSQLDatabaseReader) ListRoutines() ([]entities.Routine, error) {
 			procedure := psql.PSQLProcedure{
 				Name:         fmt.Sprintf("%s.%s", functionSchema, functionName),
 				Language:     language,
-				Dependencies: dependencies[fmt.Sprintf("%s.%s", functionSchema, functionName)],
-				Parameters:   parameters,
+				Dependencies: dependencyList,
+				Parameters:   parameters.String,
 				Tag:          tag,
 				Definition:   definition,
 			}

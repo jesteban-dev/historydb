@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+var BACKUPSNAPSHOT_VERSION int64 = 1
+
 // BackupSnapshot defines a struct which contains all the data relative to a backup snapshot
 //
 // Timestamp -> The timestamp when the snapshot was taken
@@ -18,6 +20,7 @@ import (
 // Data -> Map that links every scheam with its data files
 // Routines -> Map that links every routine with its backup files
 type BackupSnapshot struct {
+	Version            int64
 	Timestamp          time.Time
 	SnapshotId         string
 	Message            string
@@ -57,6 +60,7 @@ func (snapshot *BackupSnapshot) encodeData() []byte {
 	}
 
 	buf.WriteByte(flags)
+	encode.EncodeInt(&buf, &snapshot.Version)
 	encode.EncodeTime(&buf, &snapshot.Timestamp)
 	encode.EncodeString(&buf, &snapshot.SnapshotId)
 	encode.EncodeString(&buf, &snapshot.Message)
@@ -72,6 +76,10 @@ func (snapshot *BackupSnapshot) DecodeFromBytes(data []byte) error {
 	buf := bytes.NewBuffer(data)
 
 	flags, err := buf.ReadByte()
+	if err != nil {
+		return err
+	}
+	version, err := decode.DecodeInt(buf)
 	if err != nil {
 		return err
 	}
@@ -135,6 +143,7 @@ func (snapshot *BackupSnapshot) DecodeFromBytes(data []byte) error {
 		}
 	}
 
+	snapshot.Version = *version
 	snapshot.Timestamp = *timestamp
 	snapshot.SnapshotId = *snapshotId
 	snapshot.Message = *message
