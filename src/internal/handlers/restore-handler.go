@@ -16,17 +16,21 @@ func (handler *RestoreHanlder) RestoreDatabase(snapshotId *string) {
 		return
 	}
 
-	if ok := handler.restoreUc.StartDatabaseRestore(); !ok {
+	if ok := handler.restoreUc.BeginDatabaseRestore(); !ok {
 		return
 	}
 
 	if ok := handler.restoreUc.RestoreSchemaDependencies(snapshot); !ok {
+		handler.restoreUc.RollbackDatabaseRestore()
 		return
 	}
 
 	if ok := handler.restoreUc.RestoreSchemas(snapshot); !ok {
+		handler.restoreUc.RollbackDatabaseRestore()
 		return
 	}
 
-	handler.restoreUc.EndDatabaseRestore()
+	if ok := handler.restoreUc.CommitDatabaseRestore(); !ok {
+		handler.restoreUc.RollbackDatabaseRestore()
+	}
 }
