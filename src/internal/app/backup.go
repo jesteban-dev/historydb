@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"historydb/src/internal/usecases"
 	"log/slog"
+	"net"
 	"net/url"
+	"strconv"
 )
 
 func BackupApp(args []string, logger *slog.Logger) {
@@ -33,7 +35,16 @@ func BackupApp(args []string, logger *slog.Logger) {
 	}
 	defer db.Close()
 
-	dbFactory := createDatabaseFactory(engine, db)
+	dsn, _ := url.Parse(*connString)
+	host, port, _ := net.SplitHostPort(dsn.Host)
+	var dbPort int
+	if port == "" {
+		dbPort, _ = strconv.Atoi(dsn.Port())
+	} else {
+		dbPort, _ = strconv.Atoi(port)
+	}
+
+	dbFactory := createDatabaseFactory(engine, db, host, dbPort, dsn.Path[1:])
 	backupFactory := createBackupFactory(*basePath)
 
 	backupUsecases := usecases.NewBackupUsecases(dbFactory, backupFactory, logger)
@@ -77,6 +88,7 @@ func printBackupHelp() {
 	fmt.Println("Usage: historydb backup [action] [options]")
 	fmt.Println("Actions:")
 	fmt.Println("  create \tIt creates a new backup from a database")
+	fmt.Println("  snapshot \tIt snapshots the current state of the database into the already created backup")
 	fmt.Println("Options:")
 	fmt.Println("  --connString \tDatabase connection string")
 	fmt.Println("  --path \tPath where the backup directory is located, or where it will be created")

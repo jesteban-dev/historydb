@@ -33,8 +33,8 @@ func (writer *JSONBackupWriter) WriteSchema(schema entities.Schema) error {
 	return err
 }
 
-func (writer *JSONBackupWriter) CommitSnapshotList(snapshotList []entities.Snapshot) error {
-	content, err := json.Marshal(snapshotList)
+func (writer *JSONBackupWriter) CommitSnapshot(metadata entities.BackupMetadata) error {
+	content, err := json.Marshal(metadata)
 	if err != nil {
 		return err
 	}
