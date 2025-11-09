@@ -66,7 +66,83 @@
                         {"name": "countrylanguage_countrycode_fkey", "columns": ["countrycode"], "referencedTable": "public.country", "referencedColumns": ["code"], "updateAction": "NO ACTION", "deleteAction": "NO ACTION"}
                     ]
                 }
-            ]
+            ],
+            "tableContent": {
+                "public.city": {
+                    "length": 4079,
+                    "maxRowSize": 84,
+                    "chunkSize": 200,
+                    "records": [
+                        {"id": 1, "name": "Kabul", "countrycode": "AFG", "district": "Kabol", "population": 1780000},
+                        {"id": 201, "name": "Sarajevo", "countrycode": "BIH", "district": "Federaatio", "population": 360000},
+                        {"id": 401, "name": "Ribeirão Pires", "countrycode": "BRA", "district": "São Paulo", "population": 108121},
+                        {"id": 601, "name": "Duran [Eloy Alfaro]", "countrycode": "ECU", "district": "Guayas", "population": 152514},
+                        {"id": 801, "name": "Cabanatuan", "countrycode": "PHL", "district": "Central Luzon", "population": 222859},
+                        {"id": 1001, "name": "Depok", "countrycode": "IDN", "district": "Yogyakarta", "population": 106800},
+                        {"id": 1201, "name": "Cuddalore", "countrycode": "IND", "district": "Tamil Nadu", "population": 153086},
+                        {"id": 1401, "name": "Khorramabad", "countrycode": "IRN", "district": "Lorestan", "population": 272815},
+                        {"id": 1601, "name": "Yokkaichi", "countrycode": "JPN", "district": "Mie", "population": 288173},
+                        {"id": 1801, "name": "Battambang", "countrycode": "KHM", "district": "Battambang", "population": 129800},
+                        {"id": 2001, "name": "Tengzhou", "countrycode": "CHN", "district": "Shandong", "population": 315083},
+                        {"id": 2201, "name": "Kaili", "countrycode": "CHN", "district": "Guizhou", "population": 113958},
+                        {"id": 2401, "name": "Athenai", "countrycode": "GRC", "district": "Attika", "population": 772072},
+                        {"id": 2601, "name": "Tecámac", "countrycode": "MEX", "district": "México", "population": 172410},
+                        {"id": 2801, "name": "Agege", "countrycode": "NGA", "district": "Lagos", "population": 105000},
+                        {"id": 3001, "name": "Metz", "countrycode": "FRA", "district": "Lorraine", "population": 123776},
+                        {"id": 3201, "name": "Ziguinchor", "countrycode": "SEN", "district": "Ziguinchor", "population": 192000},
+                        {"id": 3401, "name": "Kilis", "countrycode": "TUR", "district": "Kilis", "population": 118245},
+                        {"id": 3601, "name": "Habarovsk", "countrycode": "RUS", "district": "Habarovsk", "population": 609400},
+                        {"id": 3801, "name": "San Antonio", "countrycode": "USA", "district": "Texas", "population": 1144646},
+                        {"id": 4001, "name": "Gilbert", "countrycode": "USA", "district": "Arizona", "population": 109697}
+                    ]
+                },
+                "public.country": {
+                    "length": 239,
+                    "maxRowSize": 206,
+                    "chunkSize": 20,
+                    "records": [
+                        {"code": "AFG", "name": "Afghanistan", "continent": "Asia", "region": "Southern and Central Asia", "surfacearea": 652090, "indepyear": 1919, "population": 22720000, "lifeexpectancy": 45.900002, "gnp": 5976, "gnpold": null, "localname": "Afganistan/Afqanestan", "governmentform": "Islamic Emirate", "headofstate": "Mohammad Omar", "capital": 1, "code2": "AF"},
+                        {"code": "BEL", "name": "Belgium", "continent": "Europe", "region": "Western Europe", "surfacearea": 30518, "indepyear": 1830, "population": 10239000, "lifeexpectancy": 77.800003, "gnp": 249704, "gnpold": 243948, "localname": "België/Belgique", "governmentform": "Constitutional Monarchy, Federation", "headofstate": "Albert II", "capital": 179, "code2": "BE"},
+                        {"code": "DMA", "name": "Dominica", "continent": "North America", "region": "Caribbean", "surfacearea": 751, "indepyear": 1978, "population": 71000, "lifeexpectancy": 73.400002, "gnp": 256, "gnpold": 243, "localname": "Dominica", "governmentform": "Republic", "headofstate": "Vernon Shaw", "capital": 586, "code2": "DM"},
+                        {"code": "GLP", "name": "Guadeloupe", "continent": "North America", "region": "Caribbean", "surfacearea": 1705, "indepyear": null, "population": 456000, "lifeexpectancy": 77, "gnp": 3501, "gnpold": null, "localname": "Guadeloupe", "governmentform": "Overseas Department of France", "headofstate": "Jacques Chirac", "capital": 919, "code2": "GP"},
+                        {"code": "JAM", "name": "Jamaica", "continent": "North America", "region": "Caribbean", "surfacearea": 10990, "indepyear": 1962, "population": 2583000, "lifeexpectancy": 75.199997, "gnp": 6871, "gnpold": 6722, "localname": "Jamaica", "governmentform": "Constitutional Monarchy", "headofstate": "Elisabeth II", "capital": 1530, "code2": "JM"},
+                        {"code": "CCK", "name": "Cocos (Keeling) Islands", "continent": "Oceania", "region": "Australia and New Zealand", "surfacearea": 14, "indepyear": null, "population": 600, "lifeexpectancy": null, "gnp": 0, "gnpold": null, "localname": "Cocos (Keeling) Islands", "governmentform": "Territory of Australia", "headofstate": "Elisabeth II", "capital": 2317, "code2": "CC"},
+                        {"code": "MKD", "name": "Macedonia", "continent": "Europe", "region": "Southern Europe", "surfacearea": 25713, "indepyear": 1991, "population": 2024000, "lifeexpectancy": 73.800003, "gnp": 1694, "gnpold": 1915, "localname": "Makedonija", "governmentform": "Republic", "headofstate": "Boris Trajkovski", "capital": 2460, "code2": "MK"},
+                        {"code": "NAM", "name": "Namibia", "continent": "Africa", "region": "Southern Africa", "surfacearea": 824292, "indepyear": 1990, "population": 1726000, "lifeexpectancy": 42.5, "gnp": 3101, "gnpold": 3384, "localname": "Namibia", "governmentform": "Republic", "headofstate": "Sam Nujoma", "capital": 2726, "code2": "NA"},
+                        {"code": "PRI", "name": "Puerto Rico", "continent": "North America", "region": "Caribbean", "surfacearea": 8875, "indepyear": null, "population": 3869000, "lifeexpectancy": 75.599998, "gnp": 34100, "gnpold": 32100, "localname": "Puerto Rico", "governmentform": "Commonwealth of the US", "headofstate": "George W. Bush", "capital": 2919, "code2": "PR"},
+                        {"code": "SMR", "name": "San Marino", "continent": "Europe", "region": "Southern Europe", "surfacearea": 61, "indepyear": 885, "population": 27000, "lifeexpectancy": 81.099998, "gnp": 510, "gnpold": null, "localname": "San Marino", "governmentform": "Republic", "headofstate": null, "capital": 3171, "code2": "SM"},
+                        {"code": "DNK", "name": "Denmark", "continent": "Europe", "region": "Nordic Countries", "surfacearea": 43094, "indepyear": 800, "population": 5330000, "lifeexpectancy": 76.5, "gnp": 174099, "gnpold": 169264, "localname": "Danmark", "governmentform": "Constitutional Monarchy", "headofstate": "Margrethe II", "capital": 3315, "code2": "DK"},
+                        {"code": "BLR", "name": "Belarus", "continent": "Europe", "region": "Eastern Europe", "surfacearea": 207600, "indepyear": 1991, "population": 10236000, "lifeexpectancy": 68, "gnp": 13714, "gnpold": null, "localname": "Belarus", "governmentform": "Republic", "headofstate": "Aljaksandr Luka\u009aenka", "capital": 3520, "code2": "BY"}
+                    ]
+                },
+                "public.countrylanguage": {
+                    "length": 984,
+                    "maxRowSize": 60,
+                    "chunkSize": 50,
+                    "records": [
+                        {"countrycode": "AFG", "language": "Pashto", "isofficial": true, "percentage": 52.400002},
+                        {"countrycode": "FJI", "language": "Fijian", "isofficial": true, "percentage": 50.799999},
+                        {"countrycode": "CCK", "language": "Malay", "isofficial": false, "percentage": 0},
+                        {"countrycode": "OMN", "language": "Arabic", "isofficial": true, "percentage": 76.699997},
+                        {"countrycode": "DNK", "language": "Danish", "isofficial": true, "percentage": 93.5},
+                        {"countrycode": "BGD", "language": "Chakma", "isofficial": false, "percentage": 0.40000001},
+                        {"countrycode": "IRL", "language": "Irish", "isofficial": true, "percentage": 1.6},
+                        {"countrycode": "MAR", "language": "Berberi", "isofficial": false, "percentage": 33},
+                        {"countrycode": "SYC", "language": "English", "isofficial": true, "percentage": 3.8},
+                        {"countrycode": "AND", "language": "Portuguese", "isofficial": false, "percentage": 10.8},
+                        {"countrycode": "CAN", "language": "Chinese", "isofficial": false, "percentage": 2.5},
+                        {"countrycode": "REU", "language": "Comorian", "isofficial": false, "percentage": 2.8},
+                        {"countrycode": "AZE", "language": "Armenian", "isofficial": false, "percentage": 2},
+                        {"countrycode": "LBR", "language": "Gio", "isofficial": false, "percentage": 7.9000001},
+                        {"countrycode": "TKM", "language": "Kazakh", "isofficial": false, "percentage": 2},
+                        {"countrycode": "COD", "language": "Zande", "isofficial": false, "percentage": 6.0999999},
+                        {"countrycode": "EST", "language": "Finnish", "isofficial": false, "percentage": 0.69999999},
+                        {"countrycode": "ROM", "language": "Serbo-Croatian", "isofficial": false, "percentage": 0.1},
+                        {"countrycode": "DNK", "language": "Norwegian", "isofficial": false, "percentage": 0.30000001},
+                        {"countrycode": "NGA", "language": "Ijo", "isofficial": false, "percentage": 1.8}
+                    ]
+                }
+            }
         }
     }, {
         "name": "Dellstore DB Test",
@@ -206,6 +282,104 @@
                         {"name": "date_expected", "type": "date", "isNullable": true, "position": 6}
                     ]
                 }
+            ],
+            "tableContent": {
+                "public.categories": {
+                    "length": 16,
+                    "maxRowSize": 40,
+                    "chunkSize": 4,
+                    "records": [
+                        {"category": 1, "categoryname": "Action"},
+                        {"category": 5, "categoryname": "Comedy"},
+                        {"category": 9, "categoryname": "Foreign"},
+                        {"category": 13, "categoryname": "New"}
+                    ]
+                },
+                "public.customers": {
+                    "length": 20000,
+                    "maxRowSize": 194,
+                    "chunkSize": 2000,
+                    "records": [
+                        {"customerid": 1, "firstname": "VKUUXF", "lastname": "ITHOMQJNYX", "address1": "4608499546 Dell Way", "address2": null, "city": "QSDPAGD", "state": "SD", "zip": 24101, "country": "US", "region": 1, "email": "ITHOMQJNYX@dell.com", "phone": "4608499546", "creditcardtype": 1, "creditcard": "1979279217775911", "creditcardexpiration": "2012/03", "username": "user1", "password": "password", "age": 55, "income": 100000, "gender": "M"},
+                        {"customerid": 2001, "firstname": "LTMAHF", "lastname": "LNNBYHHIGY", "address1": "1001614924 Dell Way", "address2": null, "city": "XTLGXRX", "state": "MD", "zip": 60295, "country": "US", "region": 1, "email": "LNNBYHHIGY@dell.com", "phone": "1001614924", "creditcardtype": 2, "creditcard": "4158183055929840", "creditcardexpiration": "2011/09", "username": "user2001", "password": "password", "age": 74, "income": 20000, "gender": "F"},
+                        {"customerid": 4001, "firstname": "IMYAYU", "lastname": "YTJXGCFHWJ", "address1": "4942974925 Dell Way", "address2": null, "city": "EVYIIYY", "state": "LA", "zip": 87912, "country": "US", "region": 1, "email": "YTJXGCFHWJ@dell.com", "phone": "4942974925", "creditcardtype": 2, "creditcard": "3971776042133570", "creditcardexpiration": "2010/01", "username": "user4001", "password": "password", "age": 22, "income": 100000, "gender": "M"},
+                        {"customerid": 6001, "firstname": "RZKRNQ", "lastname": "ZRDXBZHLZM", "address1": "4214268075 Dell Way", "address2": null, "city": "KBTHSEF", "state": "ND", "zip": 23997, "country": "US", "region": 1, "email": "ZRDXBZHLZM@dell.com", "phone": "4214268075", "creditcardtype": 2, "creditcard": "7078812733292580", "creditcardexpiration": "2010/11", "username": "user6001", "password": "password", "age": 70, "income": 40000, "gender": "M"},
+                        {"customerid": 8001, "firstname": "RTYKLZ", "lastname": "AWHGWKNKMF", "address1": "9094764851 Dell Way", "address2": null, "city": "LAZWJQW", "state": "WY", "zip": 34834, "country": "US", "region": 1, "email": "AWHGWKNKMF@dell.com", "phone": "9094764851", "creditcardtype": 5, "creditcard": "5071015951689333", "creditcardexpiration": "2008/04", "username": "user8001", "password": "password", "age": 38, "income": 80000, "gender": "F"},
+                        {"customerid": 10001, "firstname": "QQGWSL", "lastname": "NNTHRFAVRX", "address1": "6739733410 Dell Way", "address2": null, "city": "KQLKYDL", "state": null, "zip": 0, "country": "UK", "region": 2, "email": "NNTHRFAVRX@dell.com", "phone": "6739733410", "creditcardtype": 5, "creditcard": "3180290846154094", "creditcardexpiration": "2010/06", "username": "user10001", "password": "password", "age": 62, "income": 100000, "gender": "F"},
+                        {"customerid": 12001, "firstname": "KKPQBY", "lastname": "JDLUPSWWSD", "address1": "7087720097 Dell Way", "address2": null, "city": "FMJQJVB", "state": null, "zip": 0, "country": "Chile", "region": 2, "email": "JDLUPSWWSD@dell.com", "phone": "7087720097", "creditcardtype": 5, "creditcard": "6277906919363887", "creditcardexpiration": "2011/11", "username": "user12001", "password": "password", "age": 63, "income": 20000, "gender": "F"},
+                        {"customerid": 14001, "firstname": "BPGIXX", "lastname": "XWRAGPSDPR", "address1": "6341127964 Dell Way", "address2": null, "city": "HCVCEGB", "state": null, "zip": 0, "country": "Germany", "region": 2, "email": "XWRAGPSDPR@dell.com", "phone": "6341127964", "creditcardtype": 5, "creditcard": "2779878668952733", "creditcardexpiration": "2012/05", "username": "user14001", "password": "password", "age": 41, "income": 80000, "gender": "F"},
+                        {"customerid": 16001, "firstname": "NLNNKJ", "lastname": "OFPQTZQNZG", "address1": "9248454082 Dell Way", "address2": null, "city": "UXEKOQN", "state": null, "zip": 0, "country": "Australia", "region": 2, "email": "OFPQTZQNZG@dell.com", "phone": "9248454082", "creditcardtype": 3, "creditcard": "3312776351813227", "creditcardexpiration": "2009/08", "username": "user16001", "password": "password", "age": 75, "income": 40000, "gender": "F"},
+                        {"customerid": 18001, "firstname": "XWYOVV", "lastname": "OFBFKFIRLM", "address1": "2933766882 Dell Way", "address2": null, "city": "ONXARPP", "state": null, "zip": 0, "country": "Canada", "region": 2, "email": "OFBFKFIRLM@dell.com", "phone": "2933766882", "creditcardtype": 3, "creditcard": "1694544910918921", "creditcardexpiration": "2011/07", "username": "user18001", "password": "password", "age": 67, "income": 20000, "gender": "F"}
+                    ]
+                },
+                "public.cust_hist": {
+                    "length": 60350,
+                    "maxRowSize": 36,
+                    "chunkSize": 10000,
+                    "records": [
+                        {"customerid": 7888, "orderid": 1, "prod_id": 9117},
+                        {"customerid": 12033, "orderid": 1985, "prod_id": 3844},
+                        {"customerid": 13953, "orderid": 3958, "prod_id": 7382},
+                        {"customerid": 7638, "orderid": 5946, "prod_id": 6664},
+                        {"customerid": 9534, "orderid": 7947, "prod_id": 7549},
+                        {"customerid": 760, "orderid": 9925, "prod_id": 1585},
+                        {"customerid": 11438, "orderid": 11927, "prod_id": 948}
+                    ]
+                },
+                "public.inventory": {
+                    "length": 10000,
+                    "maxRowSize": 36,
+                    "chunkSize": 2000,
+                    "records": [
+                        {"prod_id": 1, "quan_in_stock": 138, "sales": 9},
+                        {"prod_id": 2001, "quan_in_stock": 235, "sales": 6},
+                        {"prod_id": 4001, "quan_in_stock": 163, "sales": 15},
+                        {"prod_id": 6001, "quan_in_stock": 218, "sales": 17},
+                        {"prod_id": 8001, "quan_in_stock": 152, "sales": 2}
+                    ]
+                },
+                "public.orderlines": {
+                    "length": 60350,
+                    "maxRowSize": 44,
+                    "chunkSize": 10000,
+                    "records": [
+                        {"orderlineid": 1, "orderid": 1, "prod_id": 9117, "quantity": 1, "orderdate": "2004-01-27T00:00:00Z"},
+                        {"orderlineid": 2, "orderid": 1985, "prod_id": 3844, "quantity": 3, "orderdate": "2004-02-28T00:00:00Z"},
+                        {"orderlineid": 4, "orderid": 3958, "prod_id": 7382, "quantity": 3, "orderdate": "2004-04-15T00:00:00Z"},
+                        {"orderlineid": 6, "orderid": 5946, "prod_id": 6664, "quantity": 2, "orderdate": "2004-06-18T00:00:00Z"},
+                        {"orderlineid": 2, "orderid": 7947, "prod_id": 7549, "quantity": 3, "orderdate": "2004-08-06T00:00:00Z"},
+                        {"orderlineid": 1, "orderid": 9925, "prod_id": 1585, "quantity": 1, "orderdate": "2004-10-31T00:00:00Z"},
+                        {"orderlineid": 7, "orderid": 11927, "prod_id": 948, "quantity": 3, "orderdate": "2004-12-25T00:00:00Z"}
+                    ]
+                },
+                "public.orders": {
+                    "length": 12000,
+                    "maxRowSize": 57,
+                    "chunkSize": 4000,
+                    "records": [
+                        {"orderid": 1, "orderdate": "2004-01-27T00:00:00Z", "customerid": 7888, "netamount": 313.24, "tax": 25.84, "totalamount": 339.08},
+                        {"orderid": 4001, "orderdate": "2004-05-12T00:00:00Z", "customerid": 14005, "netamount": 350.6, "tax": 28.92, "totalamount": 379.52},
+                        {"orderid": 8001, "orderdate": "2004-09-12T00:00:00Z", "customerid": 9922, "netamount": 384.52, "tax": 31.72, "totalamount": 416.24}
+                    ]
+                },
+                "public.products": {
+                    "length": 10000,
+                    "maxRowSize": 92,
+                    "chunkSize": 2000,
+                    "records": [
+                        {"prod_id": 1, "category": 14, "title": "ACADEMY ACADEMY", "actor": "PENELOPE GUINESS", "price": 25.99, "special": 0, "common_prod_id": 1976},
+                        {"prod_id": 2001, "category": 5, "title": "ADAPTATION ACADEMY", "actor": "CARY NEESON", "price": 19.99, "special": 0, "common_prod_id": 3385},
+                        {"prod_id": 4001, "category": 11, "title": "AFRICAN ACADEMY", "actor": "INGRID DOUGLAS", "price": 20.99, "special": 0, "common_prod_id": 9099},
+                        {"prod_id": 6001, "category": 1, "title": "AIRPLANE ACADEMY", "actor": "TIM BRIDGES", "price": 22.99, "special": 0, "common_prod_id": 5905},
+                        {"prod_id": 8001, "category": 13, "title": "ALABAMA ACADEMY", "actor": "ANNETTE KINNEAR", "price": 11.99, "special": 0, "common_prod_id": 2439}
+                    ]
+                },
+                "public.reorder": {
+                    "chunkSize": 1
+                }
+            },
+            "routines": [
+                {"type": "function", "data": {"name": "public.new_customer", "language": "plpgsql", "parameters": "firstname_in character varying, lastname_in character varying, address1_in character varying, address2_in character varying, city_in character varying, state_in character varying, zip_in integer, country_in character varying, region_in integer, email_in character varying, phone_in character varying, creditcardtype_in integer, creditcard_in character varying, creditcardexpiration_in character varying, username_in character varying, password_in character varying, age_in integer, income_in integer, gender_in character varying, OUT customerid_out integer", "dependencies": [], "returnType": "integer", "tag": "$function$", "definition": "DECLARE rows_returned INT; BEGIN SELECT COUNT(*) INTO rows_returned FROM CUSTOMERS WHERE USERNAME = username_in; IF rows_returned = 0 THEN INSERT INTO CUSTOMERS (FIRSTNAME, LASTNAME, EMAIL, PHONE, USERNAME, PASSWORD, ADDRESS1, ADDRESS2, CITY, STATE, ZIP, COUNTRY, REGION, CREDITCARDTYPE, CREDITCARD, CREDITCARDEXPIRATION, AGE, INCOME, GENDER) VALUES (firstname_in, lastname_in, email_in, phone_in, username_in, password_in, address1_in, address2_in, city_in, state_in, zip_in, country_in, region_in, creditcardtype_in, creditcard_in, creditcardexpiration_in, age_in, income_in, gender_in); select currval(pg_get_serial_sequence('customers', 'customerid')) into customerid_out; ELSE customerid_out := 0; END IF; END"}}
             ]
         }
     }, {

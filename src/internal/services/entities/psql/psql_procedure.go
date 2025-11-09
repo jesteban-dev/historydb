@@ -17,12 +17,12 @@ var PSQLPROCEDURE_VERSION int64 = 1
 
 type PSQLProcedure struct {
 	Version      int64
-	Name         string
-	Language     string
-	Dependencies []string
-	Parameters   string
-	Tag          string
-	Definition   string
+	Name         string   `json:"name"`
+	Language     string   `json:"language"`
+	Dependencies []string `json:"dependencies"`
+	Parameters   string   `json:"parameters"`
+	Tag          string   `json:"tag"`
+	Definition   string   `json:"definition"`
 }
 
 func (procedure *PSQLProcedure) GetName() string {

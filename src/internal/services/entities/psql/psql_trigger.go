@@ -16,8 +16,8 @@ var PSQLTRIGGER_VERSION int64 = 1
 
 type PSQLTrigger struct {
 	Version    int64
-	Name       string
-	Definition string
+	Name       string `json:"name"`
+	Definition string `json:"definition"`
 }
 
 func (trigger *PSQLTrigger) GetName() string {

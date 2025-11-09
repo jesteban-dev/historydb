@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"historydb/src/internal/entities"
 	services "historydb/src/internal/services/database"
 	"historydb/src/internal/services/database/psql"
 	psql_entities "historydb/src/internal/services/entities/psql"
@@ -22,9 +23,23 @@ import (
 )
 
 type PSQLExpectedData struct {
-	IsEmpty   bool                         `json:"isEmpty"`
-	Sequences []psql_entities.PSQLSequence `json:"sequences,omitempty"`
-	Tables    []sql_entities.SQLTable      `json:"tables"`
+	IsEmpty      bool                         `json:"isEmpty"`
+	Sequences    []psql_entities.PSQLSequence `json:"sequences,omitempty"`
+	Tables       []sql_entities.SQLTable      `json:"tables"`
+	TableContent map[string]PSQLTableContent  `json:"tableContent"`
+	Routines     []interface{}                `json:"routines"`
+}
+
+type PSQLTableContent struct {
+	Length     int                      `json:"length"`
+	MaxRowSize int                      `json:"maxRowSize"`
+	ChunkSize  int                      `json:"chunkSize"`
+	Records    []map[string]interface{} `json:"records"`
+}
+
+type PSQLRoutineType struct {
+	Type string                 `json:"type"`
+	Data map[string]interface{} `json:"data"`
 }
 
 func TestPSQLReader(t *testing.T) {
@@ -48,6 +63,40 @@ func TestPSQLReader(t *testing.T) {
 			testListSchemaDependencies(t, test.Name, dbReader, expectedData.Sequences)
 			testListSchemaNames(t, test.Name, dbReader, expectedData.Tables)
 			testGetSchemaDefinition(t, test.Name, dbReader, expectedData.Tables)
+			testGetSchemaRecordMetadata(t, test.Name, dbReader, expectedData.TableContent)
+			testGetSchemaRecordChunk(t, test.Name, dbReader, expectedData.TableContent)
+
+			expectedRoutines := make([]entities.Routine, 0, len(expectedData.Routines))
+			for _, routine := range expectedData.Routines {
+				var routineInfo PSQLRoutineType
+				routineInfoBytes, _ := json.Marshal(routine)
+				if err := json.Unmarshal(routineInfoBytes, &routineInfo); err != nil {
+					t.Fatal("could not decode routine", err)
+				}
+
+				routineDataBytes, _ := json.Marshal(routineInfo.Data)
+				switch routineInfo.Type {
+				case "function":
+					var routineData psql_entities.PSQLFunction
+					if err := json.Unmarshal(routineDataBytes, &routineData); err != nil {
+						t.Fatal("could not decode routine", err)
+					}
+					expectedRoutines = append(expectedRoutines, &routineData)
+				case "procedure":
+					var routineData psql_entities.PSQLProcedure
+					if err := json.Unmarshal(routineDataBytes, &routineData); err != nil {
+						t.Fatal("could not decode routine", err)
+					}
+					expectedRoutines = append(expectedRoutines, &routineData)
+				case "trigger":
+					var routineData psql_entities.PSQLTrigger
+					if err := json.Unmarshal(routineDataBytes, &routineData); err != nil {
+						t.Fatal("could not decode routine", err)
+					}
+					expectedRoutines = append(expectedRoutines, &routineData)
+				}
+			}
+			testListRoutines(t, test.Name, dbReader, expectedRoutines)
 
 			cleanup()
 		} else {
@@ -156,6 +205,81 @@ func testGetSchemaDefinition(t *testing.T, testName string, dbReader services.Da
 			assert.Equal(t, types.NormalizeSlice(expectedTable.Constraints), types.NormalizeSlice(table.Constraints), fmt.Sprintf("GetSchemaDefinition - Test: %v", testName))
 			assert.Equal(t, types.NormalizeSlice(expectedTable.ForeignKeys), types.NormalizeSlice(table.ForeignKeys), fmt.Sprintf("GetSchemaDefinition - Test: %v", testName))
 			assert.Equal(t, types.NormalizeSlice(expectedTable.Indexes), types.NormalizeSlice(table.Indexes), fmt.Sprintf("GetSchemaDefinition - Test: %v", testName))
+		}
+	}
+}
+
+func testGetSchemaRecordMetadata(t *testing.T, testName string, dbReader services.DatabaseReader, expectedData map[string]PSQLTableContent) {
+	for tableName, expectedTableData := range expectedData {
+		metadata, err := dbReader.GetSchemaRecordMetadata(tableName)
+		assert.Nil(t, err, fmt.Sprintf("GetSchemaRecordMetadata - Test: %s", testName))
+		assert.Equal(t, expectedTableData.Length, metadata.Count, fmt.Sprintf("GetSchemaRecordMetadata - Test: %s", testName))
+		assert.Equal(t, expectedTableData.MaxRowSize, metadata.MaxRecordSize, fmt.Sprintf("GetSchemaRecordMetadata - Test: %s", testName))
+	}
+}
+
+func testGetSchemaRecordChunk(t *testing.T, testName string, dbReader services.DatabaseReader, expectedData map[string]PSQLTableContent) {
+	for tableName, expectedTableData := range expectedData {
+		schema, err := dbReader.GetSchemaDefinition(tableName)
+		assert.Nil(t, err, fmt.Sprintf("GetSchemaRecordChunk - GetSchemaDefinition - Test: %s", testName))
+		assert.NotNil(t, schema, fmt.Sprintf("GetSchemaRecordChunk - GetSchemaDefinition - Test: %s", testName))
+
+		var cursor interface{} = nil
+		expectedRecordIndex := 0
+		for {
+			chunk, nextCursor, err := dbReader.GetSchemaRecordChunk(schema, int64(expectedTableData.ChunkSize), cursor)
+			assert.Nil(t, err, fmt.Sprintf("GetSchemaRecordChunk - Test: %s", testName))
+
+			chunkRecord := chunk.(*sql_entities.SQLRecordChunk)
+			if len(chunkRecord.Content) == 0 {
+				break
+			} else {
+				assert.LessOrEqual(t, len(chunkRecord.Content), expectedTableData.ChunkSize, fmt.Sprintf("GetSchemaRecordChunk - Test: %s", testName))
+
+				for k, v := range chunkRecord.Content[0].Content {
+					switch a := v.(type) {
+					case time.Time:
+						var recordValue interface{}
+						for key, value := range expectedTableData.Records[expectedRecordIndex] {
+							if key == k {
+								recordValue = value
+							}
+						}
+						e, err := time.Parse(time.RFC3339, recordValue.(string))
+						assert.Nil(t, err, fmt.Sprintf("GetSchemaRecordChunk - Test: %v", testName))
+						assert.Equal(t, e.Unix(), a.Unix(), fmt.Sprintf("GetSchemaRecordChunk - Test: %v", testName))
+					case int64:
+						var recordValue interface{}
+						for key, value := range expectedTableData.Records[expectedRecordIndex] {
+							if key == k {
+								recordValue = value
+							}
+						}
+						assert.Equal(t, v, int64(recordValue.(float64)), fmt.Sprintf("GetSchemaRecordChunk - Test: %v", testName))
+					default:
+						var recordValue interface{}
+						for key, value := range expectedTableData.Records[expectedRecordIndex] {
+							if key == k {
+								recordValue = value
+							}
+						}
+						assert.Equal(t, v, recordValue, fmt.Sprintf("GetSchemaRecordChunk - Test: %v", testName))
+					}
+				}
+				expectedRecordIndex++
+			}
+
+			cursor = nextCursor
+		}
+	}
+}
+
+func testListRoutines(t *testing.T, testName string, dbReader services.DatabaseReader, expectedRoutines []entities.Routine) {
+	routines, err := dbReader.ListRoutines()
+	assert.Nil(t, err, fmt.Sprintf("ListRoutines - Test: %s", testName))
+	if assert.Equal(t, len(expectedRoutines), len(routines), fmt.Sprintf("ListRoutines - Test: %s", testName)) {
+		for i, routine := range routines {
+			assert.Equal(t, expectedRoutines[i], routine, fmt.Sprintf("ListRoutines - Test: %s", testName))
 		}
 	}
 }

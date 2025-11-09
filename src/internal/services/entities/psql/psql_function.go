@@ -17,14 +17,14 @@ var PSQLFUNCTION_VERSION int64 = 1
 
 type PSQLFunction struct {
 	Version      int64
-	Name         string
-	Language     string
-	Volatility   string
-	Dependencies []string
-	Parameters   string
-	ReturnType   string
-	Tag          string
-	Definition   string
+	Name         string   `json:"name"`
+	Language     string   `json:"language"`
+	Volatility   string   `json:"volatility"`
+	Dependencies []string `json:"dependencies"`
+	Parameters   string   `json:"parameters"`
+	ReturnType   string   `json:"returnType"`
+	Tag          string   `json:"tag"`
+	Definition   string   `json:"definition"`
 }
 
 func (function *PSQLFunction) GetName() string {
