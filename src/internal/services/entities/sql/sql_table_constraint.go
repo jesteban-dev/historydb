@@ -16,10 +16,10 @@ const (
 )
 
 type SQLTableConstraint struct {
-	Type       ConstraintType
-	Name       string
-	Columns    []string
-	Definition *string
+	Type       ConstraintType `json:"type"`
+	Name       string         `json:"name"`
+	Columns    []string       `json:"columns"`
+	Definition *string        `json:"definition"`
 }
 
 func (constraint SQLTableConstraint) EncodeToBytes() []byte {

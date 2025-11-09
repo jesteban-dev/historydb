@@ -18,12 +18,12 @@ const (
 )
 
 type SQLTableForeignKey struct {
-	Name              string
-	Columns           []string
-	ReferencedTable   string
-	ReferencedColumns []string
-	UpdateAction      ActionType
-	DeleteAction      ActionType
+	Name              string     `json:"name"`
+	Columns           []string   `json:"columns"`
+	ReferencedTable   string     `json:"referencedTable"`
+	ReferencedColumns []string   `json:"referencedColumns"`
+	UpdateAction      ActionType `json:"updateAction"`
+	DeleteAction      ActionType `json:"deleteAction"`
 }
 
 func (fk SQLTableForeignKey) EncodeToBytes() []byte {

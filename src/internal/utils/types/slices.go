@@ -11,6 +11,13 @@ func SeachInSlice[T comparable](slice []T, item T) bool {
 	return false
 }
 
+func NormalizeSlice[T any](s []T) []T {
+	if s == nil {
+		return []T{}
+	}
+	return s
+}
+
 // ToInterfaceSlice converts an interface to a interface slice
 func ToInterfaceSlice(v interface{}) []interface{} {
 	if v == nil {

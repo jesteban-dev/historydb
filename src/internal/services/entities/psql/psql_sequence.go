@@ -16,15 +16,15 @@ var PSQLSEQUENCE_VERSION int64 = 1
 
 type PSQLSequence struct {
 	Version   int64
-	Name      string
-	Type      string
-	Start     int64
-	Min       int64
-	Max       int64
-	Increment int64
-	IsCycle   bool
-	LastValue int64
-	IsCalled  bool
+	Name      string `json:"name"`
+	Type      string `json:"type"`
+	Start     int64  `json:"start"`
+	Min       int64  `json:"min"`
+	Max       int64  `json:"max"`
+	Increment int64  `json:"increment"`
+	IsCycle   bool   `json:"isCycle"`
+	LastValue int64  `json:"lastValue"`
+	IsCalled  bool   `json:"isCalled"`
 }
 
 func (seq *PSQLSequence) GetDependencyType() entities.DependencyType {

@@ -9,10 +9,10 @@ import (
 )
 
 type SQLTableIndex struct {
-	Name    string
-	Type    string
-	Columns []string
-	Options map[string]interface{}
+	Name    string                 `json:"name"`
+	Type    string                 `json:"type"`
+	Columns []string               `json:"columns"`
+	Options map[string]interface{} `json:"options"`
 }
 
 func (index SQLTableIndex) EncodeToBytes() []byte {

@@ -16,11 +16,11 @@ var SQLTABLE_VERSION int64 = 1
 
 type SQLTable struct {
 	Version     int64
-	Name        string
-	Columns     []SQLTableColumn
-	Constraints []SQLTableConstraint
-	ForeignKeys []SQLTableForeignKey
-	Indexes     []SQLTableIndex
+	Name        string               `json:"name"`
+	Columns     []SQLTableColumn     `json:"columns"`
+	Constraints []SQLTableConstraint `json:"constraints"`
+	ForeignKeys []SQLTableForeignKey `json:"foreignKeys"`
+	Indexes     []SQLTableIndex      `json:"indexes"`
 }
 
 func (table *SQLTable) GetSchemaType() entities.SchemaType {

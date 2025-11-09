@@ -8,11 +8,11 @@ import (
 )
 
 type SQLTableColumn struct {
-	Name         string
-	Type         string
-	IsNullable   bool
-	DefaultValue *string
-	Position     int64
+	Name         string  `json:"name"`
+	Type         string  `json:"type"`
+	IsNullable   bool    `json:"isNullable"`
+	DefaultValue *string `json:"defaultValue"`
+	Position     int64   `json:"position"`
 }
 
 func (column SQLTableColumn) EncodeToBytes() []byte {

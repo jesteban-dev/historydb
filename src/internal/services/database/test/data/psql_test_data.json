@@ -1,0 +1,241 @@
+[
+    {
+        "name": "Empty Test",
+        "image": "postgres:18.0",
+        "dbName": "test",
+        "expectedData": {
+            "isEmpty": true
+        }
+    }, {
+        "name": "World DB Test",
+        "image": "aa8y/postgres-dataset:world",
+        "dbName": "world",
+        "expectedData": {
+            "isEmpty": false,
+            "tables": [
+                {
+                    "name": "public.city",
+                    "columns": [
+                        {"name": "id", "type": "integer", "isNullable": false, "position": 1},
+					    {"name": "name", "type": "text", "isNullable": false, "position": 2},
+					    {"name": "countrycode", "type": "character(3)", "isNullable": false, "position": 3},
+					    {"name": "district", "type": "text", "isNullable": false, "position": 4},
+					    {"name": "population", "type": "integer", "isNullable": false, "position": 5}
+                    ],
+                    "constraints": [
+                        {"type": "PRIMARY KEY", "name": "city_pkey", "columns": ["id"]}
+                    ]
+                }, {
+                    "name": "public.country",
+                    "columns": [
+                        {"name": "code", "type": "character(3)", "isNullable": false, "position": 1},
+                        {"name": "name", "type": "text", "isNullable": false, "position": 2},
+                        {"name": "continent", "type": "text", "isNullable": false, "position": 3},
+                        {"name": "region", "type": "text", "isNullable": false, "position": 4},
+                        {"name": "surfacearea", "type": "real", "isNullable": false, "position": 5},
+                        {"name": "indepyear", "type": "smallint", "isNullable": true, "position": 6},
+                        {"name": "population", "type": "integer", "isNullable": false, "position": 7},
+                        {"name": "lifeexpectancy", "type": "real", "isNullable": true, "position": 8},
+                        {"name": "gnp", "type": "numeric(10,2)", "isNullable": true, "position": 9},
+                        {"name": "gnpold", "type": "numeric(10,2)", "isNullable": true, "position": 10},
+                        {"name": "localname", "type": "text", "isNullable": false, "position": 11},
+                        {"name": "governmentform", "type": "text", "isNullable": false, "position": 12},
+                        {"name": "headofstate", "type": "text", "isNullable": true, "position": 13},
+                        {"name": "capital", "type": "integer", "isNullable": true, "position": 14},
+                        {"name": "code2", "type": "character(2)", "isNullable": false, "position": 15}
+                    ],
+                    "constraints": [
+                        {"type": "CHECK", "name": "country_continent_check", "definition": "((continent = 'Asia'::text) OR (continent = 'Europe'::text) OR (continent = 'North America'::text) OR (continent = 'Africa'::text) OR (continent = 'Oceania'::text) OR (continent = 'Antarctica'::text) OR (continent = 'South America'::text))"},
+					    {"type": "PRIMARY KEY", "name": "country_pkey", "columns": ["code"]}
+                    ],
+                    "foreignKeys": [
+                        {"name": "country_capital_fkey", "columns": ["capital"], "referencedTable": "public.city", "referencedColumns": ["id"], "updateAction": "NO ACTION", "deleteAction": "NO ACTION"}
+                    ]
+                }, {
+                    "name": "public.countrylanguage",
+                    "columns": [
+                        {"name": "countrycode", "type": "character(3)", "isNullable": false, "position": 1},
+					    {"name": "language", "type": "text", "isNullable": false, "position": 2},
+					    {"name": "isofficial", "type": "boolean", "isNullable": false, "position": 3},
+					    {"name": "percentage", "type": "real", "isNullable": false, "position": 4}
+                    ],
+                    "constraints": [
+                        {"type": "PRIMARY KEY", "name": "countrylanguage_pkey", "columns": ["countrycode", "language"]}
+                    ],
+                    "foreignKeys": [
+                        {"name": "countrylanguage_countrycode_fkey", "columns": ["countrycode"], "referencedTable": "public.country", "referencedColumns": ["code"], "updateAction": "NO ACTION", "deleteAction": "NO ACTION"}
+                    ]
+                }
+            ]
+        }
+    }, {
+        "name": "Dellstore DB Test",
+        "image": "aa8y/postgres-dataset:dellstore",
+        "dbName": "dellstore",
+        "expectedData": {
+            "isEmpty": false,
+            "sequences": [
+                {"name": "public.categories_category_seq", "type": "integer", "start": 1, "min": 1, "max": 2147483647, "increment": 1, "isCycle": false, "lastValue": 16, "isCalled": true},
+			    {"name": "public.customers_customerid_seq", "type": "integer", "start": 1, "min": 1, "max": 2147483647, "increment": 1, "isCycle": false, "lastValue": 20000, "isCalled": true},
+			    {"name": "public.orders_orderid_seq", "type": "integer", "start": 1, "min": 1, "max": 2147483647, "increment": 1, "isCycle": false, "lastValue": 12000, "isCalled": true},
+			    {"name": "public.products_prod_id_seq", "type": "integer", "start": 1, "min": 1, "max": 2147483647, "increment": 1, "isCycle": false, "lastValue": 10000, "isCalled": true}
+            ],
+            "tables": [
+                {
+                    "name": "public.categories",
+                    "columns": [
+                        {"name": "category", "type": "integer", "isNullable": false, "defaultValue": "nextval('categories_category_seq'::regclass)", "position": 1},
+					    {"name": "categoryname", "type": "character varying(50)", "isNullable": false, "position": 2}
+                    ],
+                    "constraints": [
+                        {"type": "PRIMARY KEY", "name": "categories_pkey", "columns": ["category"]}
+                    ]
+                }, {
+                    "name": "public.cust_hist",
+                    "columns": [
+                        {"name": "customerid", "type": "integer", "isNullable": false, "position": 1},
+					    {"name": "orderid", "type": "integer", "isNullable": false, "position": 2},
+					    {"name": "prod_id", "type": "integer", "isNullable": false, "position": 3}
+                    ],
+                    "foreignKeys": [
+                        {"name": "fk_cust_hist_customerid", "columns": ["customerid"], "referencedTable": "public.customers", "referencedColumns": ["customerid"], "updateAction": "NO ACTION", "deleteAction": "CASCADE"}
+                    ],
+                    "indexes": [
+                        {"name": "ix_cust_hist_customerid", "type": "btree", "columns": ["customerid"], "options": {"isUnique": false}}
+                    ]
+                }, {
+                    "name": "public.customers",
+                    "columns": [
+                        {"name": "customerid", "type": "integer", "isNullable": false, "defaultValue": "nextval('customers_customerid_seq'::regclass)", "position": 1},
+                        {"name": "firstname", "type": "character varying(50)", "isNullable": false, "position": 2},
+                        {"name": "lastname", "type": "character varying(50)", "isNullable": false, "position": 3},
+                        {"name": "address1", "type": "character varying(50)", "isNullable": false, "position": 4},
+                        {"name": "address2", "type": "character varying(50)", "isNullable": true, "position": 5},
+                        {"name": "city", "type": "character varying(50)", "isNullable": false, "position": 6},
+                        {"name": "state", "type": "character varying(50)", "isNullable": true, "position": 7},
+                        {"name": "zip", "type": "integer", "isNullable": true, "position": 8},
+                        {"name": "country", "type": "character varying(50)", "isNullable": false, "position": 9},
+                        {"name": "region", "type": "smallint", "isNullable": false, "position": 10},
+                        {"name": "email", "type": "character varying(50)", "isNullable": true, "position": 11},
+                        {"name": "phone", "type": "character varying(50)", "isNullable": true, "position": 12},
+                        {"name": "creditcardtype", "type": "integer", "isNullable": false, "position": 13},
+                        {"name": "creditcard", "type": "character varying(50)", "isNullable": false, "position": 14},
+                        {"name": "creditcardexpiration", "type": "character varying(50)", "isNullable": false, "position": 15},
+                        {"name": "username", "type": "character varying(50)", "isNullable": false, "position": 16},
+                        {"name": "password", "type": "character varying(50)", "isNullable": false, "position": 17},
+                        {"name": "age", "type": "smallint", "isNullable": true, "position": 18},
+                        {"name": "income", "type": "integer", "isNullable": true, "position": 19},
+                        {"name": "gender", "type": "character varying(1)", "isNullable": true, "position": 20}
+                    ],
+                    "constraints": [
+                        {"type": "PRIMARY KEY", "name": "customers_pkey", "columns": ["customerid"]}
+                    ],
+                    "indexes": [
+                        {"name": "ix_cust_username", "type": "btree", "columns": ["username"], "options": {"isUnique": true}}
+                    ]
+                }, {
+                    "name": "public.inventory",
+                    "columns": [
+                        {"name": "prod_id", "type": "integer", "isNullable": false, "position": 1},
+					    {"name": "quan_in_stock", "type": "integer", "isNullable": false, "position": 2},
+					    {"name": "sales", "type": "integer", "isNullable": false, "position": 3}
+                    ],
+                    "constraints": [
+                        {"type": "PRIMARY KEY", "name": "inventory_pkey", "columns": ["prod_id"]}
+                    ]
+                }, {
+                    "name": "public.orderlines",
+                    "columns": [
+                        {"name": "orderlineid", "type": "integer", "isNullable": false, "position": 1},
+                        {"name": "orderid", "type": "integer", "isNullable": false, "position": 2},
+                        {"name": "prod_id", "type": "integer", "isNullable": false, "position": 3},
+                        {"name": "quantity", "type": "smallint", "isNullable": false, "position": 4},
+                        {"name": "orderdate", "type": "date", "isNullable": false, "position": 5}
+                    ],
+                    "foreignKeys": [
+                        {"name": "fk_orderid", "columns": ["orderid"], "referencedTable": "public.orders", "referencedColumns": ["orderid"], "updateAction": "NO ACTION", "deleteAction":"CASCADE"}
+                    ],
+                    "indexes": [
+                        {"name": "ix_orderlines_orderid", "type": "btree", "columns": ["orderid", "orderlineid"], "options": {"isUnique": true}}
+                    ]
+                }, {
+                    "name": "public.orders",
+                    "columns": [
+                        {"name": "orderid", "type": "integer", "isNullable": false, "defaultValue": "nextval('orders_orderid_seq'::regclass)", "position": 1},
+                        {"name": "orderdate", "type": "date", "isNullable": false, "position": 2},
+                        {"name": "customerid", "type": "integer", "isNullable": true, "position": 3},
+                        {"name": "netamount", "type": "numeric(12,2)", "isNullable": false, "position": 4},
+                        {"name": "tax", "type": "numeric(12,2)", "isNullable": false, "position": 5},
+                        {"name": "totalamount", "type": "numeric(12,2)", "isNullable": false, "position": 6}
+                    ],
+                    "constraints": [
+                        {"type": "PRIMARY KEY", "name": "orders_pkey", "columns": ["orderid"]}
+                    ],
+                    "foreignKeys": [
+                        {"name": "fk_customerid", "columns": ["customerid"], "referencedTable": "public.customers", "referencedColumns": ["customerid"], "updateAction": "NO ACTION", "deleteAction": "SET NULL"}
+                    ],
+                    "indexes": [
+                        {"name": "ix_order_custid", "type": "btree", "columns": ["customerid"], "options": {"isUnique": false}}
+                    ]
+                }, {
+                    "name": "public.products",
+                    "columns": [
+                        {"name": "prod_id", "type": "integer", "isNullable": false, "defaultValue": "nextval('products_prod_id_seq'::regclass)", "position": 1},
+                        {"name": "category", "type": "integer", "isNullable": false, "position": 2},
+                        {"name": "title", "type": "character varying(50)", "isNullable": false, "position": 3},
+                        {"name": "actor", "type": "character varying(50)", "isNullable": false, "position": 4},
+                        {"name": "price", "type": "numeric(12,2)", "isNullable": false, "position": 5},
+                        {"name": "special", "type": "smallint", "isNullable": true, "position": 6},
+                        {"name": "common_prod_id", "type": "integer", "isNullable": false, "position": 7}
+                    ],
+                    "constraints": [
+                        {"type": "PRIMARY KEY", "name": "products_pkey", "columns": ["prod_id"]}
+                    ],
+                    "indexes": [
+                        {"name": "ix_prod_category", "type": "btree", "columns": ["category"], "options": {"isUnique": false}},
+                        {"name": "ix_prod_special", "type": "btree", "columns": ["special"], "options": {"isUnique": false}}
+                    ]
+                }, {
+                    "name": "public.reorder",
+                    "columns": [
+                        {"name": "prod_id", "type": "integer", "isNullable": false, "position": 1},
+                        {"name": "date_low", "type": "date", "isNullable": false, "position": 2},
+                        {"name": "quan_low", "type": "integer", "isNullable": false, "position": 3},
+                        {"name": "date_reordered", "type": "date", "isNullable": true, "position": 4},
+                        {"name": "quan_reordered", "type": "integer", "isNullable": true, "position": 5},
+                        {"name": "date_expected", "type": "date", "isNullable": true, "position": 6}
+                    ]
+                }
+            ]
+        }
+    }, {
+        "_comment": "if the initScript file is not found, this test will not be executed",
+        "name": "Custom SQL File DB Test",
+        "image": "postgres:18.0",
+        "initScript": "./data/psql_poblate_test1.sql",
+        "dbName": "customDB",
+        "expectedData": {
+            "isEmpty": false,
+            "sequences": [
+                {"name": "public.users_id_seq", "type": "integer", "start": 1, "min": 1, "max": 2147483647, "increment": 1, "isCycle": false, "lastValue": 1, "isCalled": false}
+            ],
+            "tables": [
+                {
+                    "name": "public.users",
+                    "columns": [
+                        {"name": "id", "type": "integer", "isNullable": false, "defaultValue": "nextval('users_id_seq'::regclass)", "position": 1},
+                        {"name": "username", "type": "character varying(16)", "isNullable": false, "position": 2},
+                        {"name": "email", "type": "character varying(50)", "isNullable": false, "position": 3},
+                        {"name": "name", "type": "character varying(16)", "isNullable": false, "position": 4},
+                        {"name": "surname", "type": "character varying(50)", "isNullable": true, "position": 5}
+                    ],
+                    "constraints": [
+                        {"type": "UNIQUE", "name": "users_email_uk", "columns": ["email"]},
+                        {"type": "PRIMARY KEY", "name": "users_pk", "columns": ["id"]},
+                        {"type": "UNIQUE", "name": "users_username_uk", "columns": ["username"]}
+                    ]
+                }
+            ]
+        }
+    }
+]
