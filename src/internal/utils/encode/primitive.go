@@ -3,6 +3,7 @@ package encode
 import (
 	"bytes"
 	"encoding/binary"
+	"historydb/src/internal/utils/types"
 	"time"
 )
 
@@ -16,6 +17,15 @@ func EncodeString(buf *bytes.Buffer, s *string) {
 func EncodeInt(buf *bytes.Buffer, i *int64) {
 	if i != nil {
 		binary.Write(buf, binary.LittleEndian, *i)
+	}
+}
+
+func EncodeBigInt(buf *bytes.Buffer, bi *types.BigInt) {
+	if bi != nil {
+		b := bi.Bytes()
+
+		binary.Write(buf, binary.LittleEndian, uint64(len(b)))
+		buf.Write(b)
 	}
 }
 

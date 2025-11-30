@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"historydb/src/internal/utils/pointers"
+	"historydb/src/internal/utils/types"
 	"io"
 	"time"
 )
@@ -30,6 +31,23 @@ func DecodeInt(buf *bytes.Buffer) (*int64, error) {
 		return nil, err
 	}
 	return &i, nil
+}
+
+func DecodeBigInt(buf *bytes.Buffer) (*types.BigInt, error) {
+	var length uint64
+	if err := binary.Read(buf, binary.LittleEndian, &length); err != nil {
+		return nil, err
+	}
+
+	b := make([]byte, length)
+	n, err := io.ReadFull(buf, b)
+	if err != nil {
+		return nil, err
+	}
+
+	bi := types.BigInt{}
+	bi.SetBytes(b[:n])
+	return &bi, nil
 }
 
 func DecodeBool(buf *bytes.Buffer) (*bool, error) {

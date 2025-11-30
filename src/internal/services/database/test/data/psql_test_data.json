@@ -151,10 +151,10 @@
         "expectedData": {
             "isEmpty": false,
             "sequences": [
-                {"name": "public.categories_category_seq", "type": "integer", "start": 1, "min": 1, "max": 2147483647, "increment": 1, "isCycle": false, "lastValue": 16, "isCalled": true},
-			    {"name": "public.customers_customerid_seq", "type": "integer", "start": 1, "min": 1, "max": 2147483647, "increment": 1, "isCycle": false, "lastValue": 20000, "isCalled": true},
-			    {"name": "public.orders_orderid_seq", "type": "integer", "start": 1, "min": 1, "max": 2147483647, "increment": 1, "isCycle": false, "lastValue": 12000, "isCalled": true},
-			    {"name": "public.products_prod_id_seq", "type": "integer", "start": 1, "min": 1, "max": 2147483647, "increment": 1, "isCycle": false, "lastValue": 10000, "isCalled": true}
+                {"name": "public.categories_category_seq", "type": "integer", "start": "1", "min": "1", "max": "2147483647", "increment": "1", "isCycle": false, "lastValue": "16", "isCalled": true},
+			    {"name": "public.customers_customerid_seq", "type": "integer", "start": "1", "min": "1", "max": "2147483647", "increment": "1", "isCycle": false, "lastValue": "20000", "isCalled": true},
+			    {"name": "public.orders_orderid_seq", "type": "integer", "start": "1", "min": "1", "max": "2147483647", "increment": "1", "isCycle": false, "lastValue": "12000", "isCalled": true},
+			    {"name": "public.products_prod_id_seq", "type": "integer", "start": "1", "min": "1", "max": "2147483647", "increment": "1", "isCycle": false, "lastValue": "10000", "isCalled": true}
             ],
             "tables": [
                 {
@@ -391,13 +391,13 @@
         "expectedData": {
             "isEmpty": false,
             "sequences": [
-                {"name": "public.users_id_seq", "type": "integer", "start": 1, "min": 1, "max": 2147483647, "increment": 1, "isCycle": false, "lastValue": 1, "isCalled": false}
+                {"name": "public.users_id_seq", "type": "bigint", "start": "1", "min": "1", "max": "9223372036854775807", "increment": "1", "isCycle": false, "lastValue": "1", "isCalled": false}
             ],
             "tables": [
                 {
                     "name": "public.users",
                     "columns": [
-                        {"name": "id", "type": "integer", "isNullable": false, "defaultValue": "nextval('users_id_seq'::regclass)", "position": 1},
+                        {"name": "id", "type": "bigint", "isNullable": false, "defaultValue": "nextval('users_id_seq'::regclass)", "position": 1},
                         {"name": "username", "type": "character varying(16)", "isNullable": false, "position": 2},
                         {"name": "email", "type": "character varying(50)", "isNullable": false, "position": 3},
                         {"name": "name", "type": "character varying(16)", "isNullable": false, "position": 4},

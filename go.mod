@@ -68,6 +68,7 @@ require (
 )
 
 require (
+	github.com/jackc/pgx/v5 v5.7.6
 	github.com/lib/pq v1.10.9
 	github.com/schollz/progressbar/v3 v3.18.0
 	golang.org/x/sys v0.32.0 // indirect

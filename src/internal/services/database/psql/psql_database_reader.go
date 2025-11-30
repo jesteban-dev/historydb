@@ -8,6 +8,7 @@ import (
 	sql_entities "historydb/src/internal/services/entities/sql"
 	"historydb/src/internal/services/utils"
 	"historydb/src/internal/utils/types"
+	"math/big"
 	"regexp"
 	"sort"
 	"strconv"
@@ -39,7 +40,7 @@ func (reader *PSQLDatabaseReader) CheckDBIsEmpty() (bool, error) {
 
 func (reader *PSQLDatabaseReader) ListSchemaDependencies() ([]entities.SchemaDependency, error) {
 	rows, err := reader.db.Query(`
-		SELECT sequence_schema, sequence_name, data_type, start_value::bigint, minimum_value::bigint, maximum_value::bigint, increment::bigint, CASE cycle_option WHEN 'YES' THEN TRUE ELSE FALSE END AS cycle_option
+		SELECT sequence_schema, sequence_name, data_type, start_value, minimum_value, maximum_value, increment, CASE cycle_option WHEN 'YES' THEN TRUE ELSE FALSE END AS cycle_option
 		FROM information_schema.sequences
 		ORDER BY sequence_schema, sequence_name
 	`)
@@ -50,29 +51,34 @@ func (reader *PSQLDatabaseReader) ListSchemaDependencies() ([]entities.SchemaDep
 
 	sequences := []entities.SchemaDependency{}
 	for rows.Next() {
-		var sequence_schema, sequence_name, data_type string
-		var start_value, minimum_value, maximum_value, increment int64
+		var sequenceSchema, sequenceName, dataType, startValueStr, minimumValueStr, maximumValueStr, incrementStr string
 		var cycle_option bool
-		if err := rows.Scan(&sequence_schema, &sequence_name, &data_type, &start_value, &minimum_value, &maximum_value, &increment, &cycle_option); err != nil {
+		if err := rows.Scan(&sequenceSchema, &sequenceName, &dataType, &startValueStr, &minimumValueStr, &maximumValueStr, &incrementStr, &cycle_option); err != nil {
 			return nil, err
 		}
 
-		var lastValue int64
+		var lastValueStr string
 		var isCalled bool
-		valueQuery := fmt.Sprintf("SELECT last_value, is_called FROM %s.%s", pq.QuoteIdentifier(sequence_schema), pq.QuoteIdentifier(sequence_name))
-		if err := reader.db.QueryRow(valueQuery).Scan(&lastValue, &isCalled); err != nil {
+		valueQuery := fmt.Sprintf("SELECT last_value::text, is_called FROM %s.%s", pq.QuoteIdentifier(sequenceSchema), pq.QuoteIdentifier(sequenceName))
+		if err := reader.db.QueryRow(valueQuery).Scan(&lastValueStr, &isCalled); err != nil {
 			return nil, err
 		}
+
+		startValue, _ := new(big.Int).SetString(startValueStr, 10)
+		minimumValue, _ := new(big.Int).SetString(minimumValueStr, 10)
+		maximumValue, _ := new(big.Int).SetString(maximumValueStr, 10)
+		increment, _ := new(big.Int).SetString(incrementStr, 10)
+		lastValue, _ := new(big.Int).SetString(lastValueStr, 10)
 
 		sequences = append(sequences, &psql.PSQLSequence{
-			Name:      fmt.Sprintf("%s.%s", sequence_schema, sequence_name),
-			Type:      data_type,
-			Start:     start_value,
-			Min:       minimum_value,
-			Max:       maximum_value,
-			Increment: increment,
+			Name:      fmt.Sprintf("%s.%s", sequenceSchema, sequenceName),
+			Type:      dataType,
+			Start:     types.BigInt{Int: *startValue},
+			Min:       types.BigInt{Int: *minimumValue},
+			Max:       types.BigInt{Int: *maximumValue},
+			Increment: types.BigInt{Int: *increment},
 			IsCycle:   cycle_option,
-			LastValue: lastValue,
+			LastValue: types.BigInt{Int: *lastValue},
 			IsCalled:  isCalled,
 		})
 	}

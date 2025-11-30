@@ -10,21 +10,22 @@ import (
 	"historydb/src/internal/utils/decode"
 	"historydb/src/internal/utils/encode"
 	"historydb/src/internal/utils/pointers"
+	"historydb/src/internal/utils/types"
 )
 
 var PSQLSEQUENCE_VERSION int64 = 1
 
 type PSQLSequence struct {
 	Version   int64
-	Name      string `json:"name"`
-	Type      string `json:"type"`
-	Start     int64  `json:"start"`
-	Min       int64  `json:"min"`
-	Max       int64  `json:"max"`
-	Increment int64  `json:"increment"`
-	IsCycle   bool   `json:"isCycle"`
-	LastValue int64  `json:"lastValue"`
-	IsCalled  bool   `json:"isCalled"`
+	Name      string       `json:"name"`
+	Type      string       `json:"type"`
+	Start     types.BigInt `json:"start"`
+	Min       types.BigInt `json:"min"`
+	Max       types.BigInt `json:"max"`
+	Increment types.BigInt `json:"increment"`
+	IsCycle   bool         `json:"isCycle"`
+	LastValue types.BigInt `json:"lastValue"`
+	IsCalled  bool         `json:"isCalled"`
 }
 
 func (seq *PSQLSequence) GetDependencyType() entities.DependencyType {
@@ -55,12 +56,12 @@ func (seq *PSQLSequence) Diff(dependency entities.SchemaDependency, isDiff bool)
 		PrevRef: prevRef,
 	}
 	comparation.AssignIfChanged(&diff.Type, &seq.Type, &oldSeq.Type)
-	comparation.AssignIfChanged(&diff.Start, &seq.Start, &oldSeq.Start)
-	comparation.AssignIfChanged(&diff.Min, &seq.Min, &oldSeq.Min)
-	comparation.AssignIfChanged(&diff.Max, &seq.Max, &oldSeq.Max)
-	comparation.AssignIfChanged(&diff.Increment, &seq.Increment, &oldSeq.Increment)
+	comparation.AssignIfChangedWithEquality(&diff.Start, &seq.Start, &oldSeq.Start, func(a, b *types.BigInt) bool { return a.Cmp(&b.Int) == 0 })
+	comparation.AssignIfChangedWithEquality(&diff.Min, &seq.Min, &oldSeq.Min, func(a, b *types.BigInt) bool { return a.Cmp(&b.Int) == 0 })
+	comparation.AssignIfChangedWithEquality(&diff.Max, &seq.Max, &oldSeq.Max, func(a, b *types.BigInt) bool { return a.Cmp(&b.Int) == 0 })
+	comparation.AssignIfChangedWithEquality(&diff.Increment, &seq.Increment, &oldSeq.Increment, func(a, b *types.BigInt) bool { return a.Cmp(&b.Int) == 0 })
 	comparation.AssignIfChanged(&diff.IsCycle, &seq.IsCycle, &oldSeq.IsCycle)
-	comparation.AssignIfChanged(&diff.LastValue, &seq.LastValue, &oldSeq.LastValue)
+	comparation.AssignIfChangedWithEquality(&diff.LastValue, &seq.LastValue, &oldSeq.LastValue, func(a, b *types.BigInt) bool { return a.Cmp(&b.Int) == 0 })
 	comparation.AssignIfChanged(&diff.IsCalled, &seq.IsCalled, &oldSeq.IsCalled)
 
 	return &diff
@@ -112,19 +113,19 @@ func (seq *PSQLSequence) DecodeFromBytes(data []byte) error {
 	if err != nil {
 		return err
 	}
-	start, err := decode.DecodeInt(buf)
+	start, err := decode.DecodeBigInt(buf)
 	if err != nil {
 		return err
 	}
-	min, err := decode.DecodeInt(buf)
+	min, err := decode.DecodeBigInt(buf)
 	if err != nil {
 		return err
 	}
-	max, err := decode.DecodeInt(buf)
+	max, err := decode.DecodeBigInt(buf)
 	if err != nil {
 		return err
 	}
-	increment, err := decode.DecodeInt(buf)
+	increment, err := decode.DecodeBigInt(buf)
 	if err != nil {
 		return err
 	}
@@ -132,7 +133,7 @@ func (seq *PSQLSequence) DecodeFromBytes(data []byte) error {
 	if err != nil {
 		return err
 	}
-	lastValue, err := decode.DecodeInt(buf)
+	lastValue, err := decode.DecodeBigInt(buf)
 	if err != nil {
 		return err
 	}
@@ -161,12 +162,12 @@ func (seq *PSQLSequence) encodeData() []byte {
 	encode.EncodeInt(&buf, &PSQLSEQUENCE_VERSION)
 	encode.EncodeString(&buf, &seq.Name)
 	encode.EncodeString(&buf, &seq.Type)
-	encode.EncodeInt(&buf, &seq.Start)
-	encode.EncodeInt(&buf, &seq.Min)
-	encode.EncodeInt(&buf, &seq.Max)
-	encode.EncodeInt(&buf, &seq.Increment)
+	encode.EncodeBigInt(&buf, &seq.Start)
+	encode.EncodeBigInt(&buf, &seq.Min)
+	encode.EncodeBigInt(&buf, &seq.Max)
+	encode.EncodeBigInt(&buf, &seq.Increment)
 	encode.EncodeBool(&buf, &seq.IsCycle)
-	encode.EncodeInt(&buf, &seq.LastValue)
+	encode.EncodeBigInt(&buf, &seq.LastValue)
 	encode.EncodeBool(&buf, &seq.IsCalled)
 
 	return buf.Bytes()
@@ -176,12 +177,12 @@ type PSQLSequenceDiff struct {
 	hash      string
 	PrevRef   string
 	Type      *string
-	Start     *int64
-	Min       *int64
-	Max       *int64
-	Increment *int64
+	Start     *types.BigInt
+	Min       *types.BigInt
+	Max       *types.BigInt
+	Increment *types.BigInt
 	IsCycle   *bool
-	LastValue *int64
+	LastValue *types.BigInt
 	IsCalled  *bool
 }
 
@@ -223,30 +224,30 @@ func (diff *PSQLSequenceDiff) DecodeFromBytes(data []byte) error {
 			return err
 		}
 	}
-	var start *int64
+	var start *types.BigInt
 	if flags&(1<<1) != 0 {
-		start, err = decode.DecodeInt(buf)
+		start, err = decode.DecodeBigInt(buf)
 		if err != nil {
 			return err
 		}
 	}
-	var min *int64
+	var min *types.BigInt
 	if flags&(1<<2) != 0 {
-		min, err = decode.DecodeInt(buf)
+		min, err = decode.DecodeBigInt(buf)
 		if err != nil {
 			return err
 		}
 	}
-	var max *int64
+	var max *types.BigInt
 	if flags&(1<<3) != 0 {
-		max, err = decode.DecodeInt(buf)
+		max, err = decode.DecodeBigInt(buf)
 		if err != nil {
 			return err
 		}
 	}
-	var increment *int64
+	var increment *types.BigInt
 	if flags&(1<<4) != 0 {
-		increment, err = decode.DecodeInt(buf)
+		increment, err = decode.DecodeBigInt(buf)
 		if err != nil {
 			return err
 		}
@@ -258,9 +259,9 @@ func (diff *PSQLSequenceDiff) DecodeFromBytes(data []byte) error {
 			return err
 		}
 	}
-	var lastValue *int64
+	var lastValue *types.BigInt
 	if flags&(1<<6) != 0 {
-		lastValue, err = decode.DecodeInt(buf)
+		lastValue, err = decode.DecodeBigInt(buf)
 		if err != nil {
 			return err
 		}
@@ -291,12 +292,12 @@ func (diff *PSQLSequenceDiff) encodeData() []byte {
 	encode.EncodeString(&buf, &diff.PrevRef)
 	buf.WriteByte(diff.getByteFlags())
 	encode.EncodeString(&buf, diff.Type)
-	encode.EncodeInt(&buf, diff.Start)
-	encode.EncodeInt(&buf, diff.Min)
-	encode.EncodeInt(&buf, diff.Max)
-	encode.EncodeInt(&buf, diff.Increment)
+	encode.EncodeBigInt(&buf, diff.Start)
+	encode.EncodeBigInt(&buf, diff.Min)
+	encode.EncodeBigInt(&buf, diff.Max)
+	encode.EncodeBigInt(&buf, diff.Increment)
 	encode.EncodeBool(&buf, diff.IsCycle)
-	encode.EncodeInt(&buf, diff.LastValue)
+	encode.EncodeBigInt(&buf, diff.LastValue)
 	encode.EncodeBool(&buf, diff.IsCalled)
 
 	return buf.Bytes()

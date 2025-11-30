@@ -7,6 +7,7 @@ import (
 	"historydb/src/internal/services"
 	"historydb/src/internal/services/entities/psql"
 	sql_entities "historydb/src/internal/services/entities/sql"
+	"math/big"
 	"strings"
 	"time"
 
@@ -56,10 +57,10 @@ func (writer *PSQLDatabaseWriter) SaveSchemaDependency(dependency entities.Schem
 
 	query := fmt.Sprintf(`
 		CREATE SEQUENCE %s.%s AS %s
-		START %d
-		INCREMENT %d
-		MINVALUE %d
-		MAXVALUE %d
+		START %v
+		INCREMENT %v
+		MINVALUE %v
+		MAXVALUE %v
 	`, pq.QuoteIdentifier(sequenceSchema), pq.QuoteIdentifier(sequenceName), sequence.Type, sequence.Start, sequence.Increment, sequence.Min, sequence.Max)
 	if sequence.IsCycle {
 		query += " CYCLE"
@@ -73,9 +74,9 @@ func (writer *PSQLDatabaseWriter) SaveSchemaDependency(dependency entities.Schem
 
 	updateQuery := fmt.Sprintf("ALTER SEQUENCE %s.%s", pq.QuoteIdentifier(sequenceSchema), pq.QuoteIdentifier(sequenceName))
 	if sequence.IsCalled {
-		updateQuery += fmt.Sprintf(" RESTART WITH %d", sequence.LastValue+sequence.Increment)
+		updateQuery += fmt.Sprintf(" RESTART WITH %v", new(big.Int).Add(&sequence.LastValue.Int, &sequence.Increment.Int))
 	} else {
-		updateQuery += fmt.Sprintf(" RESTART WITH %d", sequence.LastValue)
+		updateQuery += fmt.Sprintf(" RESTART WITH %v", sequence.LastValue)
 	}
 
 	_, err := writer.tx.Exec(updateQuery)
