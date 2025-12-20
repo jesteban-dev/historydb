@@ -24,6 +24,9 @@ func NewPSQLDatabaseWriter(db *sql.DB) *PSQLDatabaseWriter {
 }
 
 func (writer *PSQLDatabaseWriter) BeginTransaction() error {
+	if writer.tx != nil {
+		return services.ErrDatabaseTransactionAlreadyStarted
+	}
 	var err error
 	writer.tx, err = writer.db.Begin()
 	return err
@@ -33,14 +36,28 @@ func (writer *PSQLDatabaseWriter) CommitTransaction() error {
 	if writer.tx == nil {
 		return services.ErrDatabaseTransactionNotFound
 	}
-	return writer.tx.Commit()
+
+	err := writer.tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	writer.tx = nil
+	return nil
 }
 
 func (writer *PSQLDatabaseWriter) RollbackTransaction() error {
 	if writer.tx == nil {
 		return services.ErrDatabaseTransactionNotFound
 	}
-	return writer.tx.Rollback()
+
+	err := writer.tx.Rollback()
+	if err != nil {
+		return err
+	}
+
+	writer.tx = nil
+	return nil
 }
 
 func (writer *PSQLDatabaseWriter) SaveSchemaDependency(dependency entities.SchemaDependency) error {
