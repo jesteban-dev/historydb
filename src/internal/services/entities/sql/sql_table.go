@@ -15,7 +15,7 @@ import (
 var SQLTABLE_VERSION int64 = 1
 
 type SQLTable struct {
-	Version     int64
+	Version     int64                `json:"version"`
 	Name        string               `json:"name"`
 	Columns     []SQLTableColumn     `json:"columns"`
 	Constraints []SQLTableConstraint `json:"constraints"`

@@ -20,14 +20,14 @@ var BACKUPSNAPSHOT_VERSION int64 = 1
 // Data -> Map that links every scheam with its data files
 // Routines -> Map that links every routine with its backup files
 type BackupSnapshot struct {
-	Version            int64
-	Timestamp          time.Time
-	SnapshotId         string
-	Message            string
-	SchemaDependencies map[string]string
-	Schemas            map[string]string
-	Data               map[string]BackupSnapshotSchemaData
-	Routines           map[string]string
+	Version            int64                               `json:"version"`
+	Timestamp          time.Time                           `json:"timestamp"`
+	SnapshotId         string                              `json:"snapshotId"`
+	Message            string                              `json:"message"`
+	SchemaDependencies map[string]string                   `json:"schemaDependencies"`
+	Schemas            map[string]string                   `json:"schemas"`
+	Data               map[string]BackupSnapshotSchemaData `json:"data"`
+	Routines           map[string]string                   `json:"routines"`
 }
 
 func (snapshot *BackupSnapshot) EncodeToBytes() []byte {
@@ -60,7 +60,7 @@ func (snapshot *BackupSnapshot) encodeData() []byte {
 	}
 
 	buf.WriteByte(flags)
-	encode.EncodeInt(&buf, &snapshot.Version)
+	encode.EncodeInt(&buf, &BACKUPSNAPSHOT_VERSION)
 	encode.EncodeTime(&buf, &snapshot.Timestamp)
 	encode.EncodeString(&buf, &snapshot.SnapshotId)
 	encode.EncodeString(&buf, &snapshot.Message)
@@ -161,9 +161,9 @@ func (snapshot *BackupSnapshot) DecodeFromBytes(data []byte) error {
 // ChunkSize -> The max-size for all chunks used to save the schema data.
 // Data -> A string of paths that represents all the batch files needed to rebuild the schema data.
 type BackupSnapshotSchemaData struct {
-	BatchSize int64
-	ChunkSize int64
-	Data      []string
+	BatchSize int64    `json:"batchSize"`
+	ChunkSize int64    `json:"chunkSize"`
+	Data      []string `json:"data"`
 }
 
 func (schemaData BackupSnapshotSchemaData) EncodeToBytes() []byte {

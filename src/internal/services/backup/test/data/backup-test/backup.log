@@ -1,0 +1,2 @@
+time="2025-12-23T17:19:23+01:00" level=info msg="creating new snapshot 18bf8a0c-32ec-4cbe-b4b7-94fa1921d3c7"
+time="2025-12-23T17:19:23+01:00" level=info msg="Commited snapshot 18bf8a0c-32ec-4cbe-b4b7-94fa1921d3c7 into backup"

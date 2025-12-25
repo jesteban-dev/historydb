@@ -16,7 +16,7 @@ import (
 var PSQLSEQUENCE_VERSION int64 = 1
 
 type PSQLSequence struct {
-	Version   int64
+	Version   int64        `json:"version"`
 	Name      string       `json:"name"`
 	Type      string       `json:"type"`
 	Start     types.BigInt `json:"start"`

@@ -15,9 +15,9 @@ var BACKUPMETADATA_VERSION int64 = 1
 // DatabaseEngine -> The DB Engine used in the backup
 // Snapshots -> List of all snapshots taken in the backup
 type BackupMetadata struct {
-	Version        int64
-	DatabaseEngine string
-	Snapshots      []BackupMetadataSnapshot
+	Version        int64                    `json:"version"`
+	DatabaseEngine string                   `json:"databaseEngine"`
+	Snapshots      []BackupMetadataSnapshot `json:"snapshots"`
 }
 
 func (metadata *BackupMetadata) EncodeToBytes() []byte {
@@ -87,9 +87,9 @@ func (metadata *BackupMetadata) DecodeFromBytes(data []byte) error {
 // Timestamp -> The timestamp when the snapshot was taken
 // SnapshotId -> The snapshot identificator
 type BackupMetadataSnapshot struct {
-	Timestamp  time.Time
-	SnapshotId string
-	Message    string
+	Timestamp  time.Time `json:"timestamp"`
+	SnapshotId string    `json:"snapshotId"`
+	Message    string    `json:"message"`
 }
 
 func (snapshot BackupMetadataSnapshot) EncodeToBytes() []byte {
