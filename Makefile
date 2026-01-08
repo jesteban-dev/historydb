@@ -7,7 +7,7 @@ SRCDIR = src/cmd
 BINDIR = /usr/local/bin
 
 # Installs the app into system or user bin
-install: build
+install:
 	@echo "Building $(APP_NAME)..."
 	@go build -ldflags="-s -w -X main.version=$(APP_VERSION)" -o $(APP_NAME) ./$(SRCDIR)
 	@echo "  Built successfully"
@@ -26,4 +26,4 @@ uninstall:
 	@rm -f $(BINDIR)/$(APP_NAME)
 	@echo "Uninstalled successfully."
 
-.PHONY: build install clean uninstall
+.PHONY: install uninstall
