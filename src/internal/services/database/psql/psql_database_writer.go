@@ -78,7 +78,7 @@ func (writer *PSQLDatabaseWriter) SaveSchemaDependency(dependency entities.Schem
 		INCREMENT %v
 		MINVALUE %v
 		MAXVALUE %v
-	`, pq.QuoteIdentifier(sequenceSchema), pq.QuoteIdentifier(sequenceName), sequence.Type, sequence.Start, sequence.Increment, sequence.Min, sequence.Max)
+	`, pq.QuoteIdentifier(sequenceSchema), pq.QuoteIdentifier(sequenceName), sequence.Type, sequence.Start.String(), sequence.Increment.String(), sequence.Min.String(), sequence.Max.String())
 	if sequence.IsCycle {
 		query += " CYCLE"
 	} else {
@@ -91,9 +91,9 @@ func (writer *PSQLDatabaseWriter) SaveSchemaDependency(dependency entities.Schem
 
 	updateQuery := fmt.Sprintf("ALTER SEQUENCE %s.%s", pq.QuoteIdentifier(sequenceSchema), pq.QuoteIdentifier(sequenceName))
 	if sequence.IsCalled {
-		updateQuery += fmt.Sprintf(" RESTART WITH %v", new(big.Int).Add(&sequence.LastValue.Int, &sequence.Increment.Int))
+		updateQuery += fmt.Sprintf(" RESTART WITH %v", new(big.Int).Add(&sequence.LastValue.Int, &sequence.Increment.Int).String())
 	} else {
-		updateQuery += fmt.Sprintf(" RESTART WITH %v", sequence.LastValue)
+		updateQuery += fmt.Sprintf(" RESTART WITH %v", sequence.LastValue.String())
 	}
 
 	_, err := writer.tx.Exec(updateQuery)
@@ -114,7 +114,7 @@ func (writer *PSQLDatabaseWriter) SaveSchema(schema entities.Schema) error {
 
 	query := fmt.Sprintf("CREATE TABLE %s.%s (", pq.QuoteIdentifier(tableSchema), pq.QuoteIdentifier(tableName))
 	for i, col := range table.Columns {
-		query += fmt.Sprintf("%s %s", col.Name, col.Type)
+		query += fmt.Sprintf("\"%s\" %s", col.Name, col.Type)
 		if !col.IsNullable {
 			query += " NOT NULL"
 		}
@@ -130,7 +130,11 @@ func (writer *PSQLDatabaseWriter) SaveSchema(schema entities.Schema) error {
 			if c.Type == sql_entities.Check {
 				query += fmt.Sprintf(", CONSTRAINT %s %s %s", c.Name, c.Type, *c.Definition)
 			} else {
-				query += fmt.Sprintf(", CONSTRAINT %s %s (%s)", c.Name, c.Type, strings.Join(c.Columns, ", "))
+				quoted := make([]string, len(c.Columns))
+				for i, col := range c.Columns {
+					quoted[i] = fmt.Sprintf("\"%s\"", col)
+				}
+				query += fmt.Sprintf(", CONSTRAINT %s %s (%s)", c.Name, c.Type, strings.Join(quoted, ", "))
 			}
 		}
 	}
@@ -166,14 +170,25 @@ func (writer *PSQLDatabaseWriter) SaveSchemaRules(schema entities.Schema) error 
 	}
 
 	for _, idx := range table.Indexes {
-		query := fmt.Sprintf(
-			"CREATE INDEX %s ON %s.%s USING %s (%s);",
+		query := "CREATE "
+		if unique, ok := idx.Options["isUnique"].(bool); ok && unique {
+			query += "UNIQUE "
+		}
+
+		query += fmt.Sprintf(
+			"INDEX %s ON %s.%s USING %s (%s)",
 			idx.Name,
 			pq.QuoteIdentifier(tableSchema),
 			pq.QuoteIdentifier(tableName),
 			idx.Type,
 			strings.Join(idx.Columns, ", "),
 		)
+
+		if cond, ok := idx.Options["partialCondition"].(string); ok && cond != "" {
+			query += " WHERE " + cond
+		}
+		query += ";"
+
 		if _, err := writer.tx.Exec(query); err != nil {
 			return err
 		}
@@ -194,7 +209,7 @@ func (writer *PSQLDatabaseWriter) SaveSchemaRecords(schema entities.Schema, chun
 
 	query := fmt.Sprintf("INSERT INTO %s.%s (", pq.QuoteIdentifier(tableSchema), pq.QuoteIdentifier(tableName))
 	for i, col := range table.Columns {
-		query += col.Name
+		query += fmt.Sprintf("\"%v\"", col.Name)
 		if i < len(table.Columns)-1 {
 			query += ", "
 		}

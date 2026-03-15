@@ -185,7 +185,7 @@ func (table *SQLTable) getByteFlags() byte {
 		flags |= 1 << 2
 	}
 	if len(table.Indexes) > 0 {
-		flags |= 2 << 3
+		flags |= 1 << 3
 	}
 	return flags
 }
