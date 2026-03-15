@@ -40,8 +40,8 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/username/project.git
-cd project
+git clone https://github.com/jesteban-dev/historydb.git
+cd historydb
 
 # Build and install the application
 sudo make install
